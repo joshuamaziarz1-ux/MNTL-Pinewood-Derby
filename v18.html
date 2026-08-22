@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v18</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v18" src="v17.html?v=18-1313"></iframe>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+const KEY='mnltDerbyV2';
+
+function appWin(){
+  try{
+    let w=shell.contentWindow;
+    for(let i=0;i<10;i++){
+      const f=w.document.querySelector('iframe');
+      if(!f||!f.contentWindow)break;
+      w=f.contentWindow;
+    }
+    return w;
+  }catch(e){return null}
+}
+function appDoc(){const w=appWin();return w?w.document:null}
+function show(id){const w=appWin();if(w&&typeof w.show==='function')w.show(id)}
+function readState(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function divisionRegs(type){
+  const s=readState();if(!s||!Array.isArray(s.registrations))return [];
+  const isTrad=type==='trad';
+  return s.registrations.filter(r=>r.status!=='Withdrawn'&&(isTrad?(r.division==='Traditional'||r.division==='Both'):(r.division==='Modified'||r.division==='Both')))
+    .sort((a,b)=>((isTrad?a.tradNo:a.modNo)||9999)-((isTrad?b.tradNo:b.modNo)||9999)||String(a.name).localeCompare(String(b.name)));
+}
+function statusOf(r,type){return r[type==='trad'?'tradCheckIn':'modCheckIn']||'waiting'}
+function summary(type){
+  const arr=divisionRegs(type),counts={checked:0,waiting:0,'no-show':0};
+  arr.forEach(r=>counts[statusOf(r,type)]=(counts[statusOf(r,type)]||0)+1);
+  return {total:arr.length,checked:counts.checked||0,waiting:counts.waiting||0,noShow:counts['no-show']||0};
+}
+function warnLeave(type,target){
+  const s=summary(type);
+  if(s.waiting>0&&!confirm(`${s.waiting} racer${s.waiting===1?' is':'s are'} still Waiting. Leave Check-In anyway?`))return;
+  show(target);
+}
+function setCheck(type,id,value){
+  const w=appWin();if(!w)return;
+  const field=type==='trad'?'tradCheckIn':'modCheckIn';
+  const s=readState();
+  if(type==='trad'&&s&&Array.isArray(s.heats)&&s.heats.length){
+    if(!confirm('A Traditional race has already been generated. Changing Check-In will clear that race schedule so it can be generated again. Continue?'))return;
+  }
+  const code=`mutate(()=>{const r=S.registrations.find(x=>x.id===${JSON.stringify(id)});if(r){r.${field}=${JSON.stringify(value)};${type==='trad'?'if(S.heats.length)clearTraditionalRace();':''}}})`;
+  try{w.eval(code)}catch(e){console.error(e);return}
+  renderCheckIn(type);
+}
+
+function installStyle(d){
+  if(d.getElementById('mnltV18Style'))return;
+  const s=d.createElement('style');s.id='mnltV18Style';s.textContent=`
+  #traditionalCheckInV18>.mnltNav,#modifiedCheckInV18>.mnltNav{display:none!important}
+  .v18Nav{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+  .v18NavButtons{display:flex;gap:8px;flex-wrap:wrap}.v18Crumb{color:#aab9c8;font-weight:700}
+  .v18CheckHeader{display:flex;justify-content:space-between;align-items:flex-end;gap:18px;flex-wrap:wrap;margin-bottom:16px}
+  .v18CheckHeader h2{font-size:32px;margin:0 0 5px}.v18BigCount{font-size:28px;font-weight:900;color:#d8a63d}
+  .v18Summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0 18px}
+  .v18SummaryBox{background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:14px;text-align:center}.v18SummaryNum{font-size:30px;font-weight:900}.v18SummaryLabel{color:#aab9c8;font-weight:700;margin-top:3px}
+  .v18CheckRow{display:grid;grid-template-columns:1fr auto;gap:14px;align-items:center;background:#0e1c2c;border:2px solid #30465f;border-radius:12px;padding:15px;margin:10px 0}
+  .v18CheckRow.checked{border-color:#4e9b67;background:#10271d}.v18CheckRow.noshow{border-color:#8d4a54;background:#29171b}.v18CheckName{font-size:21px;font-weight:900}.v18CheckCar{color:#aab9c8;font-size:15px;margin-top:4px}
+  .v18Actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex-wrap:wrap}.v18Status{font-weight:900;font-size:17px;padding:10px 12px;border-radius:8px}.v18Status.checked{color:#9ee7af}.v18Status.noshow{color:#ff9da7}
+  .v18BtnCheck{background:#2e8050!important}.v18BtnNoShow{background:#8d3541!important}.v18BtnUndo{background:#2a405a!important}
+  .v18Notice{background:#17283d;border-left:4px solid #d8a63d;border-radius:8px;padding:12px 14px;margin:12px 0;color:#d6e0ea}
+  @media(max-width:700px){.v18Summary{grid-template-columns:1fr}.v18CheckRow{grid-template-columns:1fr}.v18Actions{justify-content:flex-start}.v18Nav{align-items:flex-start;flex-direction:column}}
+  `;d.head.appendChild(s);
+}
+
+function createPage(d,type){
+  const id=type==='trad'?'traditionalCheckInV18':'modifiedCheckInV18';
+  if(d.getElementById(id))return;
+  const p=d.createElement('section');p.id=id;p.className='page hidden';
+  p.innerHTML=`<div class="v18Nav"><div class="v18NavButtons"><button class="btn v18Back">← Back</button><button class="btn v18Home">Home</button></div><div class="v18Crumb"></div></div><div class="panel"><div id="${id}Body"></div></div>`;
+  d.getElementById('appMain').appendChild(p);
+  p.querySelector('.v18Back').onclick=()=>warnLeave(type,type==='trad'?'traditionalRaceHub':'modifiedRaceHub');
+  p.querySelector('.v18Home').onclick=()=>warnLeave(type,'home');
+  p.querySelector('.v18Crumb').textContent=type==='trad'?'Home > Race Day > Traditional > Check-In':'Home > Race Day > Modified > Check-In';
+}
+
+function enableSteps(d){
+  const trad=d.querySelectorAll('#traditionalRaceHub .mnltStep');
+  if(trad.length>1){
+    const b=trad[1];b.classList.remove('mnltDisabled');b.style.cursor='pointer';
+    const sub=b.querySelector('.mnltStepSub');if(sub)sub.textContent='Mark racers here, waiting, or no show';
+    b.onclick=()=>{show('traditionalCheckInV18');renderCheckIn('trad')};
+  }
+  const mod=d.querySelectorAll('#modifiedRaceHub .mnltStep');
+  if(mod.length>1){
+    const b=mod[1];b.classList.remove('mnltDisabled');b.style.cursor='pointer';
+    const sub=b.querySelector('.mnltStepSub');if(sub)sub.textContent='Modified check-in is separate';
+    b.onclick=()=>{show('modifiedCheckInV18');renderCheckIn('mod')};
+  }
+}
+
+function renderCheckIn(type){
+  const d=appDoc();if(!d)return;
+  const id=type==='trad'?'traditionalCheckInV18':'modifiedCheckInV18';
+  const body=d.getElementById(id+'Body');if(!body)return;
+  const arr=divisionRegs(type),sum=summary(type),isTrad=type==='trad';
+  const rows=arr.length?arr.map(r=>{
+    const st=statusOf(r,type),num=isTrad?`#${r.tradNo||''}`:`M${r.modNo||''}`,car=isTrad?r.tradCar:r.modCar;
+    let actions='';
+    if(st==='checked')actions=`<span class="v18Status checked">✓ CHECKED IN</span><button class="btn v18BtnUndo" data-action="waiting" data-id="${r.id}">Undo</button>`;
+    else if(st==='no-show')actions=`<span class="v18Status noshow">NO SHOW</span><button class="btn v18BtnUndo" data-action="waiting" data-id="${r.id}">Undo</button>`;
+    else actions=`<button class="btn v18BtnCheck" data-action="checked" data-id="${r.id}">CHECK IN</button><button class="btn v18BtnNoShow" data-action="no-show" data-id="${r.id}">NO SHOW</button>`;
+    return `<div class="v18CheckRow ${st==='checked'?'checked':st==='no-show'?'noshow':''}"><div><div class="v18CheckName">${num} ${esc(r.name)}</div><div class="v18CheckCar">Car: ${esc(car||'Car name not entered')}</div></div><div class="v18Actions">${actions}</div></div>`;
+  }).join(''):'<p class="muted">No racers are registered in this division.</p>';
+  body.innerHTML=`<div class="v18CheckHeader"><div><h2>${isTrad?'Traditional':'Modified'} Check-In</h2><div class="muted">Only this division is shown here.</div></div><div class="v18BigCount">${sum.checked} of ${sum.total} Checked In</div></div><div class="v18Summary"><div class="v18SummaryBox"><div class="v18SummaryNum">${sum.checked}</div><div class="v18SummaryLabel">Checked In</div></div><div class="v18SummaryBox"><div class="v18SummaryNum">${sum.waiting}</div><div class="v18SummaryLabel">Waiting</div></div><div class="v18SummaryBox"><div class="v18SummaryNum">${sum.noShow}</div><div class="v18SummaryLabel">No Show</div></div></div>${isTrad?'<div class="v18Notice">Generate Race will use only racers marked <b>Checked In</b>. Waiting and No Show racers will not be placed into heats.</div>':'<div class="v18Notice">Modified Check-In is completely separate from Traditional. A racer entered in Both can be checked into either race independently.</div>'}${rows}`;
+  body.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>setCheck(type,Number(b.dataset.id),b.dataset.action));
+}
+
+function patchGenerate(d){
+  const b=d.getElementById('generateBtn');if(!b||b.dataset.v18Generate)return;
+  b.dataset.v18Generate='1';
+  b.onclick=()=>{
+    const arr=divisionRegs('trad'),sum=summary('trad');
+    if(sum.checked<2){alert('Check in at least two Traditional racers before generating the race.');return}
+    if(sum.waiting>0&&!confirm(`${sum.waiting} Traditional racer${sum.waiting===1?' is':'s are'} still Waiting. Generate the race using only the ${sum.checked} checked-in racers?`))return;
+    const w=appWin();if(!w)return;
+    const code=`mutate(()=>{const regs=S.registrations.filter(r=>r.status!=='Withdrawn'&&(r.division==='Traditional'||r.division==='Both')&&r.tradCheckIn==='checked').sort((a,b)=>(a.tradNo||9999)-(b.tradNo||9999));S.racers=regs.map((reg,i)=>{if(!reg.tradRacerId)reg.tradRacerId=Date.now()+i+1;return{id:reg.tradRacerId,registrationId:reg.id,name:reg.name,car:reg.tradCar||'',division:'Traditional',number:reg.tradNo||i+1}});S.heats=buildFairSchedule(S.racers.map(r=>r.id));S.current=0;S.displayMode='race';S.tieBreaks={};S.runoff=null});show('schedule')`;
+    try{w.eval(code)}catch(e){console.error(e);alert('The race could not be generated. Please try again.');}
+  };
+}
+
+function markVersion(d){const v=d.querySelector('.version');if(v)v.textContent='v18';d.title='MNLT Derby Manager v18'}
+function apply(){
+  const d=appDoc();if(!d)return;
+  installStyle(d);createPage(d,'trad');createPage(d,'mod');enableSteps(d);patchGenerate(d);renderCheckIn('trad');renderCheckIn('mod');markVersion(d);
+}
+shell.addEventListener('load',()=>{setTimeout(apply,250);setTimeout(apply,1000)});
+setInterval(apply,650);
+})();
+</script>
+</body>
+</html>
