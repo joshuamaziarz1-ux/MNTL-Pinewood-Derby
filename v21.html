@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v21</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+#mnltVersion{position:fixed;left:8px;bottom:5px;z-index:2147483647;color:#778a9d;font:12px Arial,sans-serif;pointer-events:none;background:#0b1522;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v21" src="v20.html?v=21-1451"></iframe>
+<div id="mnltVersion">v21</div>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+const KEY='mnltDerbyV2';
+const DB='mnltDerbyMedia', STORE='photos';
+
+function appWin(){
+  try{
+    let w=shell.contentWindow;
+    for(let i=0;i<16;i++){
+      const f=w.document.querySelector('iframe');
+      if(!f||!f.contentWindow)break;
+      w=f.contentWindow;
+    }
+    return w;
+  }catch(e){return null}
+}
+function appDoc(){const w=appWin();return w?w.document:null}
+function show(id){const w=appWin();if(w&&typeof w.show==='function')w.show(id)}
+function readState(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+function openDb(){return new Promise((resolve,reject)=>{const req=indexedDB.open(DB,1);req.onupgradeneeded=()=>{const db=req.result;if(!db.objectStoreNames.contains(STORE))db.createObjectStore(STORE)};req.onsuccess=()=>resolve(req.result);req.onerror=()=>reject(req.error)})}
+async function putPhoto(key,blob){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(blob,key);tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error)})}
+async function getPhoto(key){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly');const r=tx.objectStore(STORE).get(key);r.onsuccess=()=>resolve(r.result||null);r.onerror=()=>reject(r.error)})}
+async function compressImage(file){
+  const img=await new Promise((resolve,reject)=>{const i=new Image();i.onload=()=>resolve(i);i.onerror=reject;i.src=URL.createObjectURL(file)});
+  const max=1400,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight));
+  const c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));
+  c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+  return await new Promise(resolve=>c.toBlob(b=>resolve(b||file),'image/jpeg',.84));
+}
+
+const tradItems=[
+ ['length','Length is 7.0 in maximum'],['width','Overall width is 2 3/4 in maximum'],['clearance','Underbody clearance is at least 3/8 in'],['height','Car clears the finish-line / timer'],['body','Main body is pine only'],['wheels','Official BSA Grand Prix wheels'],['axles','Official BSA Grand Prix axles'],['wheelMods','Wheel modifications are polishing / smoothing only'],['axleMods','Axle modifications are deburring / polishing only'],['fourWheels','All 4 wheels touch'],['noHardware','No bearings, washers, bushings, or springs'],['dryLube','Dry lubricant only'],['secureWeights','Weights are securely attached'],['gravity','Gravity powered only'],['trackSafe','Car is safe and will not damage the track']
+];
+const modItems=[['trackSafe','Car will not damage the track'],['noBurning','No burning, flame, or track-damaging effect'],['secure','Parts and weights are securely attached']];
+
+function divisionRegs(type){const s=readState();if(!s||!Array.isArray(s.registrations))return[];const f=type==='trad'?'tradCheckIn':'modCheckIn';return s.registrations.filter(r=>r.status!=='Withdrawn'&&r[f]==='checked'&&(type==='trad'?(r.division==='Traditional'||r.division==='Both'):(r.division==='Modified'||r.division==='Both'))).sort((a,b)=>((type==='trad'?a.tradNo:a.modNo)||9999)-((type==='trad'?b.tradNo:b.modNo)||9999))}
+function inspectionOf(r,type){const f=type==='trad'?'tradInspection':'modInspection';const base=r[f]||{};return {weight:base.weight||'',items:base.items||{},approved:!!base.approved,approvedAt:base.approvedAt||'',photoSaved:!!base.photoSaved}}
+function allPass(r,type){const ins=inspectionOf(r,type),items=type==='trad'?tradItems:modItems;const listOk=items.every(([k])=>ins.items[k]==='pass');if(type==='trad'){const w=parseFloat(ins.weight);return listOk&&Number.isFinite(w)&&w>0&&w<=5}return listOk}
+function statusText(r,type){const ins=inspectionOf(r,type);if(ins.approved)return'APPROVED';const vals=Object.values(ins.items);if(vals.includes('fail')||(type==='trad'&&ins.weight!==''&&parseFloat(ins.weight)>5))return'NEEDS CORRECTION';return'IN PROGRESS'}
+function saveInspection(type,id,fnBody){const w=appWin();if(!w)return;const field=type==='trad'?'tradInspection':'modInspection';const code=`mutate(()=>{const r=S.registrations.find(x=>x.id===${Number(id)});if(r){if(!r.${field})r.${field}={weight:'',items:{},approved:false,approvedAt:'',photoSaved:false};${fnBody}}})`;try{w.eval(code)}catch(e){console.error(e)}setTimeout(()=>renderInspection(type),40)}
+function setWeight(id,value){saveInspection('trad',id,`r.tradInspection.weight=${JSON.stringify(value)};r.tradInspection.approved=false;r.tradInspection.approvedAt='';`)}
+function setItem(type,id,key,value){const field=type==='trad'?'tradInspection':'modInspection';saveInspection(type,id,`if(!r.${field}.items)r.${field}.items={};r.${field}.items[${JSON.stringify(key)}]=${JSON.stringify(value)};r.${field}.approved=false;r.${field}.approvedAt='';`)}
+function approve(type,id){const r=divisionRegs(type).find(x=>x.id===id);if(!r||!allPass(r,type))return;const field=type==='trad'?'tradInspection':'modInspection';saveInspection(type,id,`r.${field}.approved=true;r.${field}.approvedAt=new Date().toISOString();`)}
+function reopen(type,id){const field=type==='trad'?'tradInspection':'modInspection';saveInspection(type,id,`r.${field}.approved=false;r.${field}.approvedAt='';`)}
+
+function installStyle(d){if(d.getElementById('mnltV21Style'))return;const s=d.createElement('style');s.id='mnltV21Style';s.textContent=`
+.v21Nav{display:flex;justify-content:space-between;align-items:center;gap:12px;background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:10px 12px;margin-bottom:14px}.v21NavBtns{display:flex;gap:8px}.v21Crumb{color:#aab9c8;font-weight:700}
+.v21Summary{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:14px 0 18px}.v21Sum{background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:12px;text-align:center}.v21Num{font-size:28px;font-weight:900}.v21Lab{color:#aab9c8;font-weight:700}
+.v21Car{background:#0e1c2c;border:2px solid #30465f;border-radius:14px;padding:16px;margin:14px 0}.v21Car.approved{border-color:#4e9b67}.v21Car.bad{border-color:#8d4a54}.v21CarTop{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap}.v21Name{font-size:24px;font-weight:900}.v21CarName{color:#aab9c8;margin-top:4px}.v21State{font-weight:900;padding:8px 10px;border-radius:8px;background:#1a2d43}.v21State.ok{color:#9ee7af}.v21State.bad{color:#ff9da7}
+.v21Weight{display:grid;grid-template-columns:minmax(160px,240px) 1fr;gap:14px;align-items:center;background:#13243a;border-radius:10px;padding:14px;margin:14px 0}.v21Weight input{font-size:28px;font-weight:900;margin:0}.v21WeightResult{font-size:20px;font-weight:900}.v21Pass{color:#9ee7af}.v21Fail{color:#ff9da7}.v21Wait{color:#aab9c8}
+.v21Item{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #30465f}.v21Item:last-child{border-bottom:0}.v21ItemText{font-weight:700}.v21ItemBtns{display:flex;gap:7px}.v21ItemBtns .btn{padding:9px 12px}.v21SelectedPass{background:#2e8050!important}.v21SelectedFail{background:#8d3541!important}
+.v21Approve{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;padding-top:14px;border-top:1px solid #30465f}.v21Approve .btn.primary{font-size:18px}.v21PhotoBox{margin-top:16px;background:#13243a;border-radius:12px;padding:14px}.v21Photo{max-width:100%;max-height:380px;border-radius:10px;display:block;margin:10px auto}.v21PhotoBtn{font-size:20px!important;padding:14px 18px!important}.v21PhotoSaved{color:#9ee7af;font-weight:900}.v21Note{color:#aab9c8;font-size:14px}.v21Hidden{display:none!important}
+@media(max-width:760px){.v21Summary{grid-template-columns:1fr 1fr}.v21Weight{grid-template-columns:1fr}.v21Item{grid-template-columns:1fr}.v21ItemBtns{justify-content:flex-start}.v21Nav{align-items:flex-start;flex-direction:column}}
+`;d.head.appendChild(s)}
+
+function createPage(d,type){const id=type==='trad'?'traditionalInspectionV21':'modifiedInspectionV21';if(d.getElementById(id))return;const p=d.createElement('section');p.id=id;p.className='page hidden';p.innerHTML=`<div class="v21Nav"><div class="v21NavBtns"><button class="btn v21Back">← Back</button><button class="btn v21Home">Home</button></div><div class="v21Crumb">${type==='trad'?'Home > Race Day > Traditional > Inspection':'Home > Race Day > Modified > Inspection'}</div></div><div class="panel"><div id="${id}Body"></div></div>`;d.getElementById('appMain').appendChild(p);p.querySelector('.v21Back').onclick=()=>show(type==='trad'?'traditionalRaceHub':'modifiedRaceHub');p.querySelector('.v21Home').onclick=()=>show('home')}
+
+function enableSteps(d){
+ const trad=d.querySelectorAll('#traditionalRaceHub .mnltStep');if(trad.length>3){const s=trad[2];s.classList.remove('mnltDisabled');s.style.cursor='pointer';s.querySelector('.mnltStepTitle').textContent='Inspection & Car Photo';s.querySelector('.mnltStepSub').textContent='Inspect, approve, then photograph the car';s.onclick=()=>{show('traditionalInspectionV21');renderInspection('trad')};const r=trad[3];r.querySelector('.mnltStepTitle').textContent='Race Cards';r.querySelector('.mnltStepSub').textContent='Built from approved car photos — coming next'}
+ const mod=d.querySelectorAll('#modifiedRaceHub .mnltStep');if(mod.length>3){const s=mod[2];s.classList.remove('mnltDisabled');s.style.cursor='pointer';s.querySelector('.mnltStepTitle').textContent='Inspection & Car Photo';s.querySelector('.mnltStepSub').textContent='Safety check, approve, then photograph';s.onclick=()=>{show('modifiedInspectionV21');renderInspection('mod')};const r=mod[3];r.querySelector('.mnltStepTitle').textContent='Race Cards';r.querySelector('.mnltStepSub').textContent='Built from approved car photos — coming next'}
+}
+
+async function renderPhoto(type,r,host){const key=`${type}:${r.id}`;let blob=null;try{blob=await getPhoto(key)}catch(e){}if(!blob)return;const url=URL.createObjectURL(blob);host.innerHTML=`<div class="v21PhotoSaved">✓ CAR PHOTO SAVED</div><img class="v21Photo" src="${url}" alt="Car photo"><button class="btn v21PhotoBtn v21Take">RETAKE CAR PHOTO</button><input class="v21Hidden v21File" type="file" accept="image/*" capture="environment"><div class="v21Note">Photo is stored on this device for now.</div>`;wirePhoto(type,r,host)}
+function wirePhoto(type,r,host){const take=host.querySelector('.v21Take'),file=host.querySelector('.v21File');if(!take||!file)return;take.onclick=()=>file.click();file.onchange=async()=>{const f=file.files&&file.files[0];if(!f)return;take.disabled=true;take.textContent='SAVING PHOTO...';try{const blob=await compressImage(f);await putPhoto(`${type}:${r.id}`,blob);const field=type==='trad'?'tradInspection':'modInspection';saveInspection(type,r.id,`r.${field}.photoSaved=true;`)}catch(e){console.error(e)}renderInspection(type)}}
+
+function renderInspection(type){const d=appDoc();if(!d)return;const id=type==='trad'?'traditionalInspectionV21':'modifiedInspectionV21',body=d.getElementById(id+'Body');if(!body)return;const arr=divisionRegs(type),isTrad=type==='trad',items=isTrad?tradItems:modItems;const approved=arr.filter(r=>inspectionOf(r,type).approved).length,bad=arr.filter(r=>statusText(r,type)==='NEEDS CORRECTION').length,photos=arr.filter(r=>inspectionOf(r,type).photoSaved).length;
+ body.innerHTML=`<h2>${isTrad?'Traditional':'Modified'} Inspection & Car Photo</h2><p class="muted">Only checked-in ${isTrad?'Traditional':'Modified'} racers appear here. Finish the inspection first; the camera button appears only after approval.</p><div class="v21Summary"><div class="v21Sum"><div class="v21Num">${arr.length}</div><div class="v21Lab">To Inspect</div></div><div class="v21Sum"><div class="v21Num">${approved}</div><div class="v21Lab">Approved</div></div><div class="v21Sum"><div class="v21Num">${bad}</div><div class="v21Lab">Needs Correction</div></div><div class="v21Sum"><div class="v21Num">${photos}</div><div class="v21Lab">Photos</div></div></div><div id="v21Cars"></div>`;
+ const cars=body.querySelector('#v21Cars');if(!arr.length){cars.innerHTML='<p class="muted">No racers are ready for inspection yet. Check racers in first.</p>';return}
+ arr.forEach(r=>{const ins=inspectionOf(r,type),st=statusText(r,type),all=allPass(r,type),car=d.createElement('div');car.className='v21Car '+(ins.approved?'approved':st==='NEEDS CORRECTION'?'bad':'');const num=isTrad?`#${r.tradNo||''}`:`M${r.modNo||''}`;const carName=isTrad?r.tradCar:r.modCar;let weight='';if(isTrad){const n=parseFloat(ins.weight),wtClass=ins.weight===''?'v21Wait':(Number.isFinite(n)&&n>0&&n<=5?'v21Pass':'v21Fail'),wtText=ins.weight===''?'Enter scale reading':(Number.isFinite(n)&&n>0&&n<=5?'✓ PASS — 5.00 oz maximum':'✕ OVERWEIGHT / INVALID');weight=`<div class="v21Weight"><div><label>Official Weight</label><div style="display:flex;align-items:center;gap:8px"><input class="v21WeightInput" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(ins.weight)}" placeholder="0.00"><b>oz</b></div></div><div class="v21WeightResult ${wtClass}">${wtText}</div></div>`}
+ const rows=items.map(([k,label])=>{const v=ins.items[k]||'';return `<div class="v21Item"><div class="v21ItemText">${esc(label)}</div><div class="v21ItemBtns"><button class="btn v21PassBtn ${v==='pass'?'v21SelectedPass':''}" data-k="${k}">PASS</button><button class="btn v21FailBtn ${v==='fail'?'v21SelectedFail':''}" data-k="${k}">FAIL</button></div></div>`}).join('');
+ const approveBlock=ins.approved?`<span class="v21State ok">✓ APPROVED</span><button class="btn v21Reopen">REOPEN INSPECTION</button>`:`<button class="btn primary v21ApproveBtn" ${all?'':'disabled'}>APPROVE CAR</button><span class="v21Note">${all?'All checks passed. Ready to approve.':'Every item must pass before approval.'}</span>`;
+ car.innerHTML=`<div class="v21CarTop"><div><div class="v21Name">${num} ${esc(r.name)}</div><div class="v21CarName">${esc(carName||'Car name not entered')}</div></div><div class="v21State ${st==='APPROVED'?'ok':st==='NEEDS CORRECTION'?'bad':''}">${st}</div></div>${weight}<div>${rows}</div><div class="v21Approve">${approveBlock}</div>${ins.approved?'<div class="v21PhotoBox"><button class="btn primary v21PhotoBtn v21Take">TAKE CAR PHOTO</button><input class="v21Hidden v21File" type="file" accept="image/*" capture="environment"><div class="v21Note">The photo is attached to this car and stored on this device for now.</div></div>':''}`;
+ cars.appendChild(car);
+ if(isTrad){const input=car.querySelector('.v21WeightInput');input.onchange=()=>setWeight(r.id,input.value)}
+ car.querySelectorAll('.v21PassBtn').forEach(b=>b.onclick=()=>setItem(type,r.id,b.dataset.k,'pass'));car.querySelectorAll('.v21FailBtn').forEach(b=>b.onclick=()=>setItem(type,r.id,b.dataset.k,'fail'));
+ const ab=car.querySelector('.v21ApproveBtn');if(ab)ab.onclick=()=>approve(type,r.id);const rb=car.querySelector('.v21Reopen');if(rb)rb.onclick=()=>reopen(type,r.id);
+ const ph=car.querySelector('.v21PhotoBox');if(ins.approved&&ph){wirePhoto(type,r,ph);if(ins.photoSaved)renderPhoto(type,r,ph)}
+ })
+}
+
+function patchVersion(){try{let w=shell.contentWindow;for(let i=0;i<18;i++){const d=w.document;d.querySelectorAll('.version,#mnltVersion').forEach(v=>v.style.setProperty('display','none','important'));d.title='MNLT Derby Manager v21';const f=d.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}}catch(e){}}
+function apply(){const d=appDoc();if(!d)return;installStyle(d);createPage(d,'trad');createPage(d,'mod');enableSteps(d);renderInspection('trad');renderInspection('mod');patchVersion()}
+shell.addEventListener('load',()=>{setTimeout(apply,250);setTimeout(apply,1000)});setInterval(apply,700);
+})();
+</script>
+</body>
+</html>
