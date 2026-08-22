@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v25</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+#mnltVersion{position:fixed;left:8px;bottom:5px;z-index:2147483647;color:#778a9d;font:12px Arial,sans-serif;pointer-events:none;background:#0b1522;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v25" src="v24.html?v=25-1610"></iframe>
+<div id="mnltVersion">v25</div>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+const KEY='mnltDerbyV2';
+const CFG='mnltDerbyGmailConfigV1';
+const TOKEN='mnltDerbyGmailSessionV1';
+const DISMISSED='mnltDerbyGmailDismissedV1';
+const QUERY='from:no-reply@snappages.com subject:"Sukkot 2026 Pinewood Derby Sign Up - Submission" -in:trash -in:spam';
+let inbox=[];
+let checking=false;
+let tokenClient=null;
+let autoTimer=null;
+let lastAlertCount=0;
+let gisLoading=false;
+
+function appWin(){try{let w=shell.contentWindow;for(let i=0;i<26;i++){const f=w.document.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}return w}catch(e){return null}}
+function appDoc(){const w=appWin();return w?w.document:null}
+function readState(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+function readJson(key,def){try{const x=JSON.parse(localStorage.getItem(key)||'null');return x==null?def:x}catch(e){return def}}
+function saveJson(key,val){localStorage.setItem(key,JSON.stringify(val))}
+function session(){try{return JSON.parse(sessionStorage.getItem(TOKEN)||'null')}catch(e){return null}}
+function saveSession(x){sessionStorage.setItem(TOKEN,JSON.stringify(x))}
+function clearSession(){sessionStorage.removeItem(TOKEN)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function nowTime(){return new Date().toLocaleTimeString([],{hour:'numeric',minute:'2-digit'})}
+function todayLocal(){const n=new Date();const y=n.getFullYear(),m=String(n.getMonth()+1).padStart(2,'0'),d=String(n.getDate()).padStart(2,'0');return `${y}-${m}-${d}`}
+function nameKey(v){return String(v||'').trim().replace(/\s+/g,' ').toLowerCase()}
+function validToken(){const s=session();return !!(s&&s.access_token&&Number(s.expires_at)>Date.now()+30000)}
+function accessToken(){const s=session();return validToken()?s.access_token:''}
+function config(){return readJson(CFG,{clientId:'',lastChecked:'',connectedEmail:''})}
+function dismissed(){return readJson(DISMISSED,[])}
+function isExisting(item){const s=readState();const nk=nameKey(item.name);return !!(s&&Array.isArray(s.registrations)&&s.registrations.some(r=>nameKey(r.name)===nk||r.gmailMessageId===item.messageId))}
+
+function installStyle(d){if(d.getElementById('mnltV25Style'))return;const s=d.createElement('style');s.id='mnltV25Style';s.textContent=`
+.v25Mail{background:#0e1c2c;border:1px solid #30465f;border-radius:12px;padding:14px;margin:0 0 16px}.v25Mail.new{border-color:#d8a63d;box-shadow:0 0 0 1px #d8a63d inset}.v25MailTop{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}.v25MailTitle{font-size:19px;font-weight:900}.v25MailStatus{font-weight:900}.v25Good{color:#9ee7af}.v25Warn{color:#f0c55d}.v25Bad{color:#ff9da7}.v25MailActions{display:flex;gap:8px;flex-wrap:wrap}.v25NewCount{display:inline-flex;align-items:center;justify-content:center;min-width:34px;height:34px;padding:0 10px;background:#d8a63d;color:#111820;border-radius:999px;font-weight:1000;font-size:16px}.v25Inbox{display:grid;gap:9px;margin-top:12px}.v25Incoming{background:#13243a;border:1px solid #3b536d;border-radius:10px;padding:12px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.v25IncomingName{font-size:18px;font-weight:900}.v25IncomingMeta{color:#aab9c8;font-size:14px;margin-top:3px}.v25IncomingBtns{display:flex;gap:7px;flex-wrap:wrap}.v25Add{background:#2e8050!important}.v25Setup{margin-top:12px;padding-top:12px;border-top:1px solid #30465f}.v25SetupGrid{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:end}.v25Setup label{margin:0}.v25Setup input{margin:5px 0 0}.v25Tiny{color:#8fa3b8;font-size:12px;margin-top:5px}.v25Toast{position:fixed;right:16px;top:16px;z-index:2147483000;max-width:360px;background:#d8a63d;color:#111820;border-radius:10px;padding:13px 16px;font-weight:1000;box-shadow:0 10px 28px #0008;display:none}.v25Toast.show{display:block}.v25HomeBadge{display:inline-block;margin-left:7px;background:#d8a63d;color:#111820;border-radius:999px;padding:2px 7px;font-size:12px;font-weight:1000;vertical-align:middle}.v25Spinner{opacity:.72}.v25InlineNote{color:#aab9c8;font-size:13px;margin-top:8px}@media(max-width:650px){.v25Incoming{grid-template-columns:1fr}.v25SetupGrid{grid-template-columns:1fr}.v25IncomingBtns{justify-content:flex-start}}
+`;d.head.appendChild(s)}
+
+function ensureToast(d){let t=d.getElementById('v25Toast');if(!t){t=d.createElement('div');t.id='v25Toast';t.className='v25Toast';d.body.appendChild(t)}return t}
+function toast(msg){const d=appDoc();if(!d)return;const t=ensureToast(d);t.textContent=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),5000)}
+
+function ensurePanel(d){const reg=d.getElementById('registration');if(!reg)return null;let p=d.getElementById('v25GmailPanel');if(!p){p=d.createElement('div');p.id='v25GmailPanel';p.className='v25Mail';const grid=reg.querySelector('.grid2');if(grid)reg.insertBefore(p,grid);else reg.appendChild(p)}return p}
+function setupVisible(){return !!window.__mnltV25SetupOpen}
+function setSetupVisible(v){window.__mnltV25SetupOpen=!!v;renderPanel()}
+
+function renderPanel(){const d=appDoc();if(!d)return;installStyle(d);const p=ensurePanel(d);if(!p)return;const cfg=config(),connected=validToken(),fresh=inbox.filter(x=>!isExisting(x)&&!dismissed().includes(x.messageId));p.className='v25Mail'+(fresh.length?' new':'');let status='';if(checking)status='<span class="v25MailStatus v25Spinner">Checking…</span>';else if(connected)status=`<span class="v25MailStatus v25Good">✓ Gmail connected${cfg.connectedEmail?' — '+esc(cfg.connectedEmail):''}</span>`;else if(cfg.clientId)status='<span class="v25MailStatus v25Warn">Gmail needs reconnect</span>';else status='<span class="v25MailStatus v25Warn">Gmail not set up</span>';
+ const inboxHtml=fresh.length?`<div class="v25Inbox">${fresh.map(x=>`<div class="v25Incoming"><div><div class="v25IncomingName">${esc(x.name)}</div><div class="v25IncomingMeta">${esc(x.division)}${x.email?' • '+esc(x.email):''}</div></div><div class="v25IncomingBtns"><button class="btn v25Add" data-v25add="${esc(x.messageId)}">ADD RACER</button><button class="btn" data-v25dismiss="${esc(x.messageId)}">IGNORE</button></div></div>`).join('')}</div>`:'';
+ const setup=setupVisible()?`<div class="v25Setup"><div class="v25SetupGrid"><label>Google OAuth Client ID<input id="v25ClientId" value="${esc(cfg.clientId||'')}" placeholder="1234567890-...apps.googleusercontent.com"></label><button class="btn primary" id="v25SaveClient">SAVE & CONNECT</button></div><div class="v25Tiny">Stored only in this browser. No Gmail password or client secret is stored in the Derby Manager.</div></div>`:'';
+ p.innerHTML=`<div class="v25MailTop"><div><div class="v25MailTitle">Email Registration ${fresh.length?`<span class="v25NewCount">${fresh.length} NEW</span>`:''}</div>${status}<div class="v25Tiny">${cfg.lastChecked?'Last checked '+esc(cfg.lastChecked):'Checks SnapPages derby signups while the manager is open.'}</div></div><div class="v25MailActions">${connected?'<button class="btn" id="v25CheckNow">CHECK NOW</button><button class="btn" id="v25Disconnect">DISCONNECT</button>':cfg.clientId?'<button class="btn primary" id="v25Connect">CONNECT GMAIL</button>':'<button class="btn primary" id="v25SetupBtn">SET UP GMAIL</button>'}${cfg.clientId?'<button class="btn" id="v25SetupEdit">SETTINGS</button>':''}</div></div>${inboxHtml}${setup}`;
+ p.querySelector('#v25CheckNow')?.addEventListener('click',()=>checkMail(true));
+ p.querySelector('#v25Disconnect')?.addEventListener('click',()=>{clearSession();inbox=[];renderPanel();updateHomeBadge()});
+ p.querySelector('#v25Connect')?.addEventListener('click',()=>connectGmail(true));
+ p.querySelector('#v25SetupBtn')?.addEventListener('click',()=>setSetupVisible(true));
+ p.querySelector('#v25SetupEdit')?.addEventListener('click',()=>setSetupVisible(!setupVisible()));
+ p.querySelector('#v25SaveClient')?.addEventListener('click',()=>{const id=(p.querySelector('#v25ClientId')?.value||'').trim();if(!/\.apps\.googleusercontent\.com$/.test(id)){toast('That does not look like a Google OAuth Client ID.');return}saveJson(CFG,{...cfg,clientId:id});setSetupVisible(false);connectGmail(true)});
+ p.querySelectorAll('[data-v25add]').forEach(b=>b.addEventListener('click',()=>addRacer(b.dataset.v25add)));
+ p.querySelectorAll('[data-v25dismiss]').forEach(b=>b.addEventListener('click',()=>ignoreRacer(b.dataset.v25dismiss)));
+ updateHomeBadge();
+}
+
+function updateHomeBadge(){const d=appDoc();if(!d)return;const b=d.getElementById('hReg');if(!b)return;b.querySelector('.v25HomeBadge')?.remove();const n=inbox.filter(x=>!isExisting(x)&&!dismissed().includes(x.messageId)).length;if(n){const s=d.createElement('span');s.className='v25HomeBadge';s.textContent=n+' NEW';b.appendChild(s)}}
+
+function loadGIS(){return new Promise((resolve,reject)=>{if(window.google&&google.accounts&&google.accounts.oauth2)return resolve();const old=document.getElementById('v25GIS');if(old){const wait=setInterval(()=>{if(window.google&&google.accounts&&google.accounts.oauth2){clearInterval(wait);resolve()}},100);setTimeout(()=>{clearInterval(wait);reject(new Error('Google sign-in did not load'))},10000);return}if(gisLoading)return reject(new Error('Google sign-in is loading'));gisLoading=true;const s=document.createElement('script');s.id='v25GIS';s.src='https://accounts.google.com/gsi/client';s.async=true;s.defer=true;s.onload=()=>{gisLoading=false;resolve()};s.onerror=()=>{gisLoading=false;reject(new Error('Could not load Google sign-in'))};document.head.appendChild(s)})}
+async function connectGmail(interactive){const cfg=config();if(!cfg.clientId){setSetupVisible(true);return}try{await loadGIS();tokenClient=google.accounts.oauth2.initTokenClient({client_id:cfg.clientId,scope:'https://www.googleapis.com/auth/gmail.readonly',callback:async r=>{if(r.error){toast('Gmail connection was not completed.');return}saveSession({access_token:r.access_token,expires_at:Date.now()+((Number(r.expires_in)||3600)*1000)});try{const pr=await gmailFetch('https://gmail.googleapis.com/gmail/v1/users/me/profile');saveJson(CFG,{...config(),connectedEmail:pr.emailAddress||''})}catch(e){}renderPanel();checkMail(true)}});tokenClient.requestAccessToken({prompt:interactive?'consent':''})}catch(e){toast('Could not start Gmail connection.');renderPanel()}}
+
+async function gmailFetch(url){const tok=accessToken();if(!tok)throw new Error('NO_TOKEN');const r=await fetch(url,{headers:{Authorization:'Bearer '+tok}});if(r.status===401){clearSession();throw new Error('TOKEN_EXPIRED')}if(!r.ok)throw new Error('GMAIL_'+r.status);return await r.json()}
+function decode64url(data){try{const s=String(data||'').replace(/-/g,'+').replace(/_/g,'/');const pad=s+'==='.slice((s.length+3)%4);const bin=atob(pad);const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));return new TextDecoder('utf-8').decode(bytes)}catch(e){return''}}
+function payloadText(part){if(!part)return'';const mime=String(part.mimeType||'').toLowerCase();if(part.body&&part.body.data&&(mime==='text/plain'||mime==='text/html'||!part.parts))return decode64url(part.body.data);if(Array.isArray(part.parts)){const plain=part.parts.find(p=>String(p.mimeType||'').toLowerCase()==='text/plain');if(plain){const x=payloadText(plain);if(x)return x}return part.parts.map(payloadText).filter(Boolean).join('\n')}return''}
+function stripHtml(s){const d=document.createElement('div');d.innerHTML=String(s||'');return(d.textContent||d.innerText||'').replace(/\s+/g,' ').trim()}
+function field(text,label,nextLabels){const next=nextLabels.length?'(?=\\s+(?:'+nextLabels.map(x=>x.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')).join('|')+')\\s+)':'$';const re=new RegExp(label.replace(/[.*+?^${}()|[\\]\\]/g,'\\$&')+'\\s+(.+?)'+next,'i');const m=String(text||'').match(re);return m?m[1].trim():''}
+function parseSignup(message){let raw=payloadText(message.payload);if(/<[^>]+>/.test(raw))raw=stripHtml(raw);raw=(' '+raw+' '+(message.snippet||'')).replace(/\s+/g,' ').trim();const first=field(raw,'First Name',['Last Name']),last=field(raw,'Last Name',['Email']),email=field(raw,'Email',['Phone Number']),phone=field(raw,'Phone Number',['Multiple Choice']);let choice=field(raw,'Multiple Choice',['©','Copyright']);if(!choice){const m=raw.match(/Multiple Choice\s+(.+?)(?:\s+©|$)/i);choice=m?m[1].trim():''}let division='Traditional';if(/both/i.test(choice))division='Both';else if(/modified/i.test(choice))division='Modified';else if(/traditional/i.test(choice))division='Traditional';const name=(first+' '+last).trim();return{messageId:message.id,name,email,phone,choice,division,date:message.internalDate?new Date(Number(message.internalDate)).toISOString():''}}
+
+async function checkMail(userInitiated){if(checking)return;if(!validToken()){if(userInitiated&&config().clientId)connectGmail(true);else renderPanel();return}checking=true;renderPanel();try{const list=await gmailFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50&q='+encodeURIComponent(QUERY));const ids=(list.messages||[]).map(x=>x.id);const known=new Map(inbox.map(x=>[x.messageId,x]));for(const id of ids){if(known.has(id))continue;try{const m=await gmailFetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/'+encodeURIComponent(id)+'?format=full');const x=parseSignup(m);if(x.name)known.set(id,x)}catch(e){}}
+ inbox=Array.from(known.values()).filter(x=>ids.includes(x.messageId)).sort((a,b)=>String(b.date).localeCompare(String(a.date)));const cfg=config();saveJson(CFG,{...cfg,lastChecked:nowTime()});const fresh=inbox.filter(x=>!isExisting(x)&&!dismissed().includes(x.messageId));if(fresh.length>lastAlertCount){toast(fresh.length===1?'NEW DERBY REGISTRATION: '+fresh[0].name:fresh.length+' NEW DERBY REGISTRATIONS')}lastAlertCount=fresh.length;renderPanel()}catch(e){if(e.message==='TOKEN_EXPIRED'){toast('Gmail needs to be reconnected.')}else if(userInitiated){toast('Could not check Gmail.')}renderPanel()}finally{checking=false;renderPanel()}}
+
+function ignoreRacer(id){const a=dismissed();if(!a.includes(id)){a.push(id);saveJson(DISMISSED,a)}renderPanel()}
+function addRacer(id){const item=inbox.find(x=>x.messageId===id);if(!item)return;if(isExisting(item)){toast(item.name+' is already registered.');renderPanel();return}const w=appWin();if(!w)return;const payload=JSON.stringify(item);const code=`(()=>{const x=${payload};const nk=String(x.name||'').trim().toLowerCase();if(S.registrations.some(r=>String(r.name||'').trim().toLowerCase()===nk||r.gmailMessageId===x.messageId))return;mutate(()=>{const reg={id:Date.now()+Math.floor(Math.random()*100000),name:x.name,age:'',contact:x.email||x.phone||'',email:x.email||'',phone:x.phone||'',division:x.division,tradCar:'',modCar:'',status:'Registered',date:${JSON.stringify(todayLocal())},notes:'',rulesSent:false,tradNo:null,modNo:null,tradRacerId:null,modRacerId:null,gmailMessageId:x.messageId};S.registrations.push(reg);if((reg.division==='Traditional'||reg.division==='Both')&&!reg.tradNo)reg.tradNo=nextNumber('tradNo');if((reg.division==='Modified'||reg.division==='Both')&&!reg.modNo)reg.modNo=nextNumber('modNo');syncRegistrationEntries(reg);if((reg.division==='Traditional'||reg.division==='Both')&&S.heats.length)clearTraditionalRace()});if(typeof renderRegistration==='function')renderRegistration();if(typeof resetRegForm==='function')resetRegForm()})()`;try{w.eval(code);toast(item.name+' added to Registration.');renderPanel()}catch(e){console.error(e);toast('Could not add that registration.')}}
+
+function patchDuplicateRule(){const w=appWin();if(!w||w.__mnltV25DupPatch)return;try{w.registrationDuplicate=function(name,contact,id){const n=String(name||'').trim().toLowerCase();return w.S?w.S.registrations.find(r=>r.id!==id&&n&&String(r.name||'').trim().toLowerCase()===n):null};w.__mnltV25DupPatch=true}catch(e){}}
+function hideInnerVersions(){try{let w=shell.contentWindow;for(let i=0;i<26;i++){const d=w.document;d.querySelectorAll('.version,#mnltVersion').forEach(v=>v.style.setProperty('display','none','important'));d.title='MNLT Derby Manager v25';const f=d.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}}catch(e){}}
+function apply(){const d=appDoc();if(!d)return;installStyle(d);ensureToast(d);ensurePanel(d);patchDuplicateRule();renderPanel();hideInnerVersions();if(validToken()&&!autoTimer){checkMail(false);autoTimer=setInterval(()=>checkMail(false),60000)}}
+shell.addEventListener('load',()=>{setTimeout(apply,180);setTimeout(apply,800);setTimeout(apply,1600)});
+setInterval(apply,900);
+})();
+</script>
+</body>
+</html>
