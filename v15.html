@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v15</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v15" src="v11.html?v=15-1205"></iframe>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+function appWin(){try{const sd=shell.contentDocument,app=sd&&sd.getElementById('app');return app&&app.contentWindow?app.contentWindow:null}catch(e){return null}}
+function appDoc(){const w=appWin();return w?w.document:null}
+function show(id){const w=appWin();if(w&&typeof w.show==='function')w.show(id)}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function state(){try{return JSON.parse(localStorage.getItem('mnltDerbyV2')||'null')}catch(e){return null}}
+
+function style(d){if(d.getElementById('mnltV15Style'))return;const s=d.createElement('style');s.id='mnltV15Style';s.textContent=`
+.mnltNav{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+.mnltNavLeft{display:flex;gap:8px;flex-wrap:wrap}.mnltCrumb{color:#aab9c8;font-weight:700;text-align:right}
+.mnltHomeGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}.mnltHomeGrid .menu{min-height:120px;font-size:24px}.mnltHomeWide{grid-column:1/-1}
+.mnltRaceChoice{display:grid;grid-template-columns:1fr 1fr;gap:18px}.mnltRaceChoice .menu{min-height:150px;font-size:28px}
+.mnltSteps{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.mnltStep{background:#0e1c2c;border:1px solid #30465f;border-radius:12px;padding:16px;display:flex;gap:14px;align-items:center;cursor:pointer}.mnltStep:hover{filter:brightness(1.12)}.mnltStepNum{width:42px;height:42px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#d8a63d;color:#111820;font-weight:900;font-size:20px;flex:0 0 auto}.mnltStepTitle{font-size:20px;font-weight:900}.mnltStepSub{color:#aab9c8;margin-top:3px}.mnltDisabled{opacity:.5;cursor:default}.mnltDivisionList{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mnltBox{background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:14px}.mnltRow{padding:10px 0;border-bottom:1px solid #30465f}.mnltRow:last-child{border-bottom:0}.mnltName{font-size:18px;font-weight:900}.mnltSmall{color:#aab9c8;font-size:14px;margin-top:3px}
+#home .homegrid{display:none!important}
+#traditionalHub,#modifiedHub{display:none!important}
+#registration .grid2>div.panel:nth-child(2)>h3,#registration #regSummary,#registration #registrationList{display:none!important}
+#schedule .topbar h2{visibility:hidden;position:relative}#schedule .topbar h2:after{content:'Generate Race';visibility:visible;position:absolute;left:0;top:0}
+#schedule .panel>p:first-of-type{display:none!important}
+#schedule #verifyBox h3{font-size:20px}
+#control>.topbar>button,#control>.topbar>div{display:none!important}
+@media(max-width:760px){.mnltHomeGrid,.mnltRaceChoice,.mnltSteps,.mnltDivisionList{grid-template-columns:1fr}.mnltHomeWide{grid-column:auto}.mnltNav{align-items:flex-start;flex-direction:column}.mnltCrumb{text-align:left}}
+`;d.head.appendChild(s)}
+
+function addPages(d){const main=d.getElementById('appMain');if(!main)return;
+function page(id,html){if(d.getElementById(id))return d.getElementById(id);const p=d.createElement('section');p.id=id;p.className='page hidden';p.innerHTML=html;main.appendChild(p);return p}
+
+const raceDay=page('raceDayHub',`<div class="panel"><h2>Race Day</h2><p class="muted">Choose the division you are running. From here on, each division stays completely separate.</p><div class="mnltRaceChoice"><button class="menu" id="v15TraditionalRace">Traditional Race</button><button class="menu" id="v15ModifiedRace">Modified Race</button></div></div>`);
+raceDay.querySelector('#v15TraditionalRace').onclick=()=>show('traditionalRaceHub');raceDay.querySelector('#v15ModifiedRace').onclick=()=>show('modifiedRaceHub');
+
+const trad=page('traditionalRaceHub',`<div class="panel"><h2>Traditional Race</h2><p class="muted">Work straight down the steps. Everything here is Traditional only.</p><div class="mnltSteps">
+<div class="mnltStep" id="tRacers"><div class="mnltStepNum">1</div><div><div class="mnltStepTitle">Racers</div><div class="mnltStepSub">Traditional racer list only</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">2</div><div><div class="mnltStepTitle">Check-In</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">3</div><div><div class="mnltStepTitle">Inspection</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">4</div><div><div class="mnltStepTitle">Car Photo / Race Card</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep" id="tGenerate"><div class="mnltStepNum">5</div><div><div class="mnltStepTitle">Generate Race</div><div class="mnltStepSub">Build the official race schedule</div></div></div>
+<div class="mnltStep" id="tControl"><div class="mnltStepNum">6</div><div><div class="mnltStepTitle">Race Control</div><div class="mnltStepSub">Run heats and enter finishes</div></div></div>
+<div class="mnltStep" id="tResults"><div class="mnltStepNum">7</div><div><div class="mnltStepTitle">Final Results</div><div class="mnltStepSub">Standings and trophy results</div></div></div>
+</div></div>`);
+trad.querySelector('#tRacers').onclick=()=>show('racers');trad.querySelector('#tGenerate').onclick=()=>show('schedule');trad.querySelector('#tControl').onclick=()=>show('control');trad.querySelector('#tResults').onclick=()=>show('standings');
+
+const mod=page('modifiedRaceHub',`<div class="panel"><h2>Modified Race</h2><p class="muted">Everything here is Modified only. The Modified race engine will stay separate from Traditional.</p><div class="mnltSteps">
+<div class="mnltStep" id="mRacers"><div class="mnltStepNum">1</div><div><div class="mnltStepTitle">Racers</div><div class="mnltStepSub">Modified racer list only</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">2</div><div><div class="mnltStepTitle">Check-In</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">3</div><div><div class="mnltStepTitle">Inspection</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">4</div><div><div class="mnltStepTitle">Car Photo / Race Card</div><div class="mnltStepSub">Coming next</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">5</div><div><div class="mnltStepTitle">Generate Race</div><div class="mnltStepSub">Modified race setup coming later</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">6</div><div><div class="mnltStepTitle">Race Control</div><div class="mnltStepSub">Modified race control coming later</div></div></div>
+<div class="mnltStep mnltDisabled"><div class="mnltStepNum">7</div><div><div class="mnltStepTitle">Final Results</div><div class="mnltStepSub">Modified standings coming later</div></div></div>
+</div></div>`);
+mod.querySelector('#mRacers').onclick=()=>show('modifiedRacersV15');
+
+page('modifiedRacersV15',`<div class="panel"><h2>Modified Racers</h2><p class="muted">Only racers entered in Modified or Both appear here.</p><div id="v15ModifiedList"></div></div>`);
+
+const projector=page('projectorHubV15',`<div class="panel"><h2>Projector</h2><p class="muted">Audience display only. No registration or admin controls.</p><div class="mnltRaceChoice"><button class="menu" id="pPre">Pre-Race Slideshow</button><button class="menu" id="pLive">Live Race Display</button></div></div>`);
+projector.querySelector('#pPre').onclick=()=>{const b=d.getElementById('traditionalPreRaceBtn')||d.getElementById('preRaceBtn');if(b)b.click()};projector.querySelector('#pLive').onclick=()=>{const b=d.getElementById('projectorBtn')||d.getElementById('openProjector');if(b)b.click()};
+
+const admin=page('adminHubV15',`<div class="panel"><h2>Admin</h2><p class="muted">Backups, recovery and troubleshooting.</p><div class="mnltRaceChoice"><button class="menu" id="aData">Save / Load / Backup</button><button class="menu" id="aTrouble">Troubleshooting</button></div></div>`);
+admin.querySelector('#aData').onclick=()=>show('data');admin.querySelector('#aTrouble').onclick=()=>show('troubleshoot');
+}
+
+function home(d){let host=d.getElementById('v15HomeMenu');if(!host){host=d.createElement('div');host.id='v15HomeMenu';host.className='panel';const home=d.getElementById('home');home.insertBefore(host,home.firstChild)}host.innerHTML=`<h2>What are you doing?</h2><div class="mnltHomeGrid"><button class="menu" id="hReg">Registration</button><button class="menu" id="hRace">Race Day</button><button class="menu" id="hProjector">Projector</button><button class="menu" id="hAdmin">Admin</button></div>`;host.querySelector('#hReg').onclick=()=>show('registration');host.querySelector('#hRace').onclick=()=>show('raceDayHub');host.querySelector('#hProjector').onclick=()=>show('projectorHubV15');host.querySelector('#hAdmin').onclick=()=>show('adminHubV15')}
+
+function navMap(id){const m={registration:['Home > Registration','home'],raceDayHub:['Home > Race Day','home'],traditionalRaceHub:['Home > Race Day > Traditional','raceDayHub'],modifiedRaceHub:['Home > Race Day > Modified','raceDayHub'],racers:['Home > Race Day > Traditional > Racers','traditionalRaceHub'],schedule:['Home > Race Day > Traditional > Generate Race','traditionalRaceHub'],control:['Home > Race Day > Traditional > Race Control','traditionalRaceHub'],standings:['Home > Race Day > Traditional > Final Results','traditionalRaceHub'],modifiedRacersV15:['Home > Race Day > Modified > Racers','modifiedRaceHub'],projectorHubV15:['Home > Projector','home'],adminHubV15:['Home > Admin','home'],data:['Home > Admin > Save / Load','adminHubV15'],troubleshoot:['Home > Admin > Troubleshooting','adminHubV15']};return m[id]||['Home','home']}
+function nav(d){d.querySelectorAll('.page').forEach(p=>{if(p.id==='home'||p.id==='traditionalHub'||p.id==='modifiedHub')return;let n=p.querySelector(':scope > .mnltNav');if(!n){n=d.createElement('div');n.className='mnltNav';n.innerHTML=`<div class="mnltNavLeft"><button class="btn mnltBack">← Back</button><button class="btn mnltHome">Home</button></div><div class="mnltCrumb"></div>`;p.insertBefore(n,p.firstChild)}const info=navMap(p.id);n.querySelector('.mnltCrumb').textContent=info[0];n.querySelector('.mnltBack').onclick=()=>show(info[1]);n.querySelector('.mnltHome').onclick=()=>show('home')})}
+
+function registrationList(d){const panel=d.querySelector('#registration .grid2>div.panel:nth-child(2)');if(!panel)return;let host=d.getElementById('v15RegList');if(!host){host=d.createElement('div');host.id='v15RegList';panel.appendChild(host)}const s=state();if(!s||!Array.isArray(s.registrations))return;const active=s.registrations.filter(r=>r.status!=='Withdrawn').sort((a,b)=>a.name.localeCompare(b.name));host.innerHTML=`<h3>Registered Racers</h3><p class="muted">Registration is one master list. Race Day separates racers into the correct division.</p>`+(active.length?active.map(r=>`<div class="mnltRow"><div class="mnltName">${esc(r.name)}</div><div class="mnltSmall">${esc(r.division)} • ${esc(r.contact||'No contact')} • ${esc(r.status||'Registered')}</div></div>`).join(''):'<p class="muted">No registrations yet.</p>')}
+function modifiedList(d){const host=d.getElementById('v15ModifiedList');if(!host)return;const s=state();const arr=s?.modified?.racers||[];host.innerHTML=arr.length?arr.slice().sort((a,b)=>(a.number||999)-(b.number||999)).map(r=>`<div class="mnltRow"><div class="mnltName">M${r.number||''} ${esc(r.name)}</div><div class="mnltSmall">${esc(r.car||'Car name not entered')}</div></div>`).join(''):'<p class="muted">No Modified racers yet.</p>'}
+function labels(d){const h=d.querySelector('#schedule .topbar h2');if(h)h.textContent='Generate Race';const g=d.getElementById('generateBtn');if(g)g.textContent='Generate Race';const rt=d.querySelector('#racers .topbar h2');if(rt)rt.textContent='Traditional Racers';const st=d.querySelector('#standings .topbar h2');if(st)st.textContent='Final Results'}
+function hideOld(d){d.querySelectorAll('#registration .topbar .homeBtn,#racers .topbar button[data-page],#schedule .topbar button[data-page],#standings .topbar button[data-page],#data .topbar .homeBtn,#troubleshoot .topbar .homeBtn').forEach(b=>b.style.display='none')}
+function apply(){const d=appDoc();if(!d)return;style(d);addPages(d);home(d);nav(d);registrationList(d);modifiedList(d);labels(d);hideOld(d);const v=d.querySelector('.version');if(v)v.textContent='v15';d.title='MNLT Derby Manager v15'}
+shell.addEventListener('load',()=>{setTimeout(apply,150);setTimeout(apply,700)});setInterval(apply,500);
+})();
+</script>
+</body>
+</html>
