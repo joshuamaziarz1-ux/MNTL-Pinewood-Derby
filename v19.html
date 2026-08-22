@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v19</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+#mnltVersion{position:fixed;left:8px;bottom:5px;z-index:2147483647;color:#778a9d;font:12px Arial,sans-serif;pointer-events:none;background:#0b1522;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v19" src="v18.html?v=19-1438"></iframe>
+<div id="mnltVersion">v19</div>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+function hideInnerVersions(){
+  try{
+    let w=shell.contentWindow;
+    for(let depth=0;depth<12;depth++){
+      const d=w.document;
+      d.querySelectorAll('.version').forEach(v=>{v.style.setProperty('display','none','important')});
+      d.title='MNLT Derby Manager v19';
+      const f=d.querySelector('iframe');
+      if(!f||!f.contentWindow)break;
+      w=f.contentWindow;
+    }
+  }catch(e){}
+}
+shell.addEventListener('load',()=>{setTimeout(hideInnerVersions,150);setTimeout(hideInnerVersions,700);setTimeout(hideInnerVersions,1500)});
+setInterval(hideInnerVersions,400);
+})();
+</script>
+</body>
+</html>
