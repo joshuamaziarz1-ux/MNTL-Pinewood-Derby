@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v13</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v13" src="v11.html?v=13-1155"></iframe>
+<script>
+(function(){
+  'use strict';
+  const shell=document.getElementById('shell');
+
+  function getApp(){
+    try{
+      const shellDoc=shell.contentDocument;
+      const app=shellDoc&&shellDoc.getElementById('app');
+      if(!app||!app.contentDocument||!app.contentWindow)return null;
+      return {doc:app.contentDocument,win:app.contentWindow};
+    }catch(e){return null}
+  }
+
+  const backTargets={
+    registration:'home',
+    traditionalHub:'home',
+    modifiedHub:'home',
+    racers:'traditionalHub',
+    schedule:'traditionalHub',
+    control:'traditionalHub',
+    standings:'traditionalHub',
+    data:'home',
+    troubleshoot:'home'
+  };
+
+  function applyNavigation(){
+    const app=getApp();
+    if(!app)return;
+    const d=app.doc,w=app.win;
+
+    const v=d.querySelector('.version');
+    if(v)v.textContent='v13';
+    d.title='MNLT Derby Manager v13';
+
+    if(!d.getElementById('v13NavStyle')){
+      const st=d.createElement('style');
+      st.id='v13NavStyle';
+      st.textContent='.v13nav{display:flex;gap:8px;align-items:center;flex-shrink:0}.v13nav .btn{min-width:90px}.v13OldNav{display:none!important}@media(max-width:540px){.v13nav .btn{min-width:auto;padding:10px 12px}}';
+      d.head.appendChild(st);
+    }
+
+    d.querySelectorAll('.topbar').forEach(function(bar){
+      const page=bar.closest('section.page');
+      if(!page||page.id==='home')return;
+      const pageId=page.id;
+
+      bar.querySelectorAll(':scope > button.homeBtn, :scope > button[data-page="traditionalHub"]').forEach(function(b){
+        b.classList.add('v13OldNav');
+      });
+
+      let nav=bar.querySelector(':scope > .v13nav');
+      if(!nav){
+        nav=d.createElement('div');
+        nav.className='v13nav';
+
+        const back=d.createElement('button');
+        back.className='btn';
+        back.type='button';
+        back.textContent='← Back';
+        back.setAttribute('aria-label','Back');
+        back.onclick=function(){
+          const target=backTargets[pageId]||'home';
+          if(typeof w.show==='function')w.show(target);
+        };
+
+        const home=d.createElement('button');
+        home.className='btn';
+        home.type='button';
+        home.textContent='Home';
+        home.setAttribute('aria-label','Home');
+        home.onclick=function(){
+          if(typeof w.show==='function')w.show('home');
+        };
+
+        nav.appendChild(back);
+        nav.appendChild(home);
+        bar.insertBefore(nav,bar.firstChild);
+      }
+    });
+  }
+
+  shell.addEventListener('load',function(){
+    applyNavigation();
+    setTimeout(applyNavigation,250);
+    setTimeout(applyNavigation,750);
+  });
+  setInterval(applyNavigation,500);
+})();
+</script>
+</body>
+</html>
