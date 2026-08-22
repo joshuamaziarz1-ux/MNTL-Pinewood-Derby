@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v26</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+#mnltVersion{position:fixed;left:8px;bottom:5px;z-index:2147483647;color:#778a9d;font:12px Arial,sans-serif;pointer-events:none;background:#0b1522;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v26" src="v25.html?v=26-1610"></iframe>
+<div id="mnltVersion">v26</div>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+function v25(){try{return shell.contentWindow}catch(e){return null}}
+function deepest(){try{let w=shell.contentWindow;for(let i=0;i<30;i++){const f=w.document.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}return w}catch(e){return null}}
+function patchGmailToken(){const w=v25();if(!w||w.__mnltV26TokenPatch)return;try{w.sessionStorage.removeItem('mnltDerbyGmailSessionV1');w.eval(`window.__mnltV26GmailSession=null;session=function(){return window.__mnltV26GmailSession};saveSession=function(x){window.__mnltV26GmailSession=x};clearSession=function(){window.__mnltV26GmailSession=null};`);w.__mnltV26TokenPatch=true}catch(e){}}
+function patchDuplicate(){const w=deepest();if(!w||w.__mnltV26DuplicatePatch)return;try{w.eval(`registrationDuplicate=function(name,contact,id){const n=String(name||'').trim().toLowerCase();return S.registrations.find(r=>r.id!==id&&n&&String(r.name||'').trim().toLowerCase()===n)}`);w.__mnltV26DuplicatePatch=true}catch(e){}}
+function hideVersions(){try{let w=shell.contentWindow;for(let i=0;i<30;i++){const d=w.document;d.querySelectorAll('.version,#mnltVersion').forEach(v=>v.style.setProperty('display','none','important'));d.title='MNLT Derby Manager v26';const f=d.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}}catch(e){}}
+function apply(){patchGmailToken();patchDuplicate();hideVersions()}
+shell.addEventListener('load',()=>{setTimeout(apply,150);setTimeout(apply,700);setTimeout(apply,1500)});
+setInterval(apply,500);
+})();
+</script>
+</body>
+</html>
