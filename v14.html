@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v14</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v14" src="v11.html?v=14-1158"></iframe>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+let lastRegStamp='';
+
+function getAppWin(){
+  try{
+    const sd=shell.contentDocument;
+    const app=sd&&sd.getElementById('app');
+    return app&&app.contentWindow?app.contentWindow:null;
+  }catch(e){return null}
+}
+function getAppDoc(){const w=getAppWin();return w?w.document:null}
+function show(id){const w=getAppWin();if(w&&typeof w.show==='function')w.show(id)}
+
+function injectStyle(d){
+  if(d.getElementById('mnltV14Style'))return;
+  const s=d.createElement('style');s.id='mnltV14Style';s.textContent=`
+  .mnltNav{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:10px 12px;margin-bottom:14px}
+  .mnltNavLeft{display:flex;gap:8px;flex-wrap:wrap}.mnltCrumb{color:#aab9c8;font-weight:700;text-align:right}
+  .mnltSplit{display:grid;grid-template-columns:1fr 1fr;gap:14px}.mnltDivisionBox{background:#0e1c2c;border:1px solid #30465f;border-radius:10px;padding:12px}
+  .mnltDivisionBox h3{margin:0 0 10px}.mnltRegRow{padding:10px;border-bottom:1px solid #30465f}.mnltRegRow:last-child{border-bottom:0}
+  .mnltRegTop{display:flex;justify-content:space-between;gap:10px;align-items:center}.mnltRegName{font-size:18px;font-weight:900}.mnltSmall{color:#aab9c8;font-size:14px;margin-top:4px}
+  .mnltHomeGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.mnltHomeGrid .menu{min-height:92px}.mnltHomeWide{grid-column:1/-1}
+  .mnltHubGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.mnltHubGrid .menu{min-height:76px}
+  .mnltComing{opacity:.65;cursor:default!important}.mnltSectionLead{margin:0 0 12px;color:#aab9c8}
+  #registration .grid2>div.panel:nth-child(2)>h3,#registration #regSummary,#registration #registrationList{display:none!important}
+  #control>.topbar>button,#control>.topbar>div{display:none!important}
+  @media(max-width:760px){.mnltSplit,.mnltHomeGrid,.mnltHubGrid{grid-template-columns:1fr}.mnltHomeWide{grid-column:auto}.mnltNav{align-items:flex-start;flex-direction:column}.mnltCrumb{text-align:left}}
+  `;d.head.appendChild(s);
+}
+
+function ensureExtraPages(d){
+  const main=d.getElementById('appMain');if(!main)return;
+  if(!d.getElementById('projectorHub')){
+    const p=d.createElement('section');p.id='projectorHub';p.className='page hidden';p.innerHTML=`<div class="panel"><h2>Projector / Audience Display</h2><p class="mnltSectionLead">Everything the audience sees is controlled here.</p><div class="mnltHubGrid"><button class="menu" id="v14LiveProjector">Open Live Projector</button><button class="menu" id="v14PreRace">Pre-Race Slideshow</button></div><div class="coming"><h3>During Racing</h3><p class="muted">Current heat, saved heat results, standings and tie-runoff screens are shown through the Live Projector. The projector does not need registration or admin controls.</p></div></div>`;main.appendChild(p);
+    p.querySelector('#v14LiveProjector').onclick=()=>{const b=d.getElementById('projectorBtn')||d.getElementById('openProjector');if(b)b.click()};
+    p.querySelector('#v14PreRace').onclick=()=>{const b=d.getElementById('traditionalPreRaceBtn')||d.getElementById('preRaceBtn');if(b)b.click()};
+  }
+  if(!d.getElementById('adminHub')){
+    const p=d.createElement('section');p.id='adminHub';p.className='page hidden';p.innerHTML=`<div class="panel"><h2>Derby Admin</h2><p class="mnltSectionLead">Backups and troubleshooting only. Race-day controls stay in their division.</p><div class="mnltHubGrid"><button class="menu" id="v14SaveLoad">Save / Load / Backup</button><button class="menu" id="v14Trouble">Troubleshooting</button></div></div>`;main.appendChild(p);
+    p.querySelector('#v14SaveLoad').onclick=()=>show('data');p.querySelector('#v14Trouble').onclick=()=>show('troubleshoot');
+  }
+}
+
+function rewriteHome(d){
+  const grid=d.querySelector('#home .homegrid');if(!grid||grid.dataset.v14==='1')return;grid.dataset.v14='1';grid.className='mnltHomeGrid';
+  grid.innerHTML=`<button class="menu" id="v14Registration">Registration & Check-In</button><button class="menu" id="v14Traditional">Traditional Division</button><button class="menu" id="v14Modified">Modified Division</button><button class="menu" id="v14Projector">Projector / Audience Display</button><button class="menu mnltHomeWide" id="v14Admin">Derby Admin</button>`;
+  grid.querySelector('#v14Registration').onclick=()=>show('registration');grid.querySelector('#v14Traditional').onclick=()=>show('traditionalHub');grid.querySelector('#v14Modified').onclick=()=>show('modifiedHub');grid.querySelector('#v14Projector').onclick=()=>show('projectorHub');grid.querySelector('#v14Admin').onclick=()=>show('adminHub');
+}
+
+function rewriteTraditionalHub(d){
+  const box=d.querySelector('#traditionalHub .divisionActions');if(!box||box.dataset.v14==='1')return;box.dataset.v14='1';box.innerHTML=`<button class="menu" id="v14TradRacers">Traditional Racers</button><button class="menu" id="v14TradSchedule">Schedule / Fairness</button><button class="menu" id="v14TradControl">Race Control</button><button class="menu" id="v14TradStandings">Standings / Results</button>`;
+  box.querySelector('#v14TradRacers').onclick=()=>show('racers');box.querySelector('#v14TradSchedule').onclick=()=>show('schedule');box.querySelector('#v14TradControl').onclick=()=>show('control');box.querySelector('#v14TradStandings').onclick=()=>show('standings');
+}
+
+function navInfo(id){
+  const map={
+    registration:['Home > Registration & Check-In','home'],traditionalHub:['Home > Traditional Division','home'],modifiedHub:['Home > Modified Division','home'],racers:['Home > Traditional Division > Racers','traditionalHub'],schedule:['Home > Traditional Division > Schedule','traditionalHub'],control:['Home > Traditional Division > Race Control','traditionalHub'],standings:['Home > Traditional Division > Standings','traditionalHub'],projectorHub:['Home > Projector / Audience Display','home'],adminHub:['Home > Derby Admin','home'],data:['Home > Derby Admin > Save / Load','adminHub'],troubleshoot:['Home > Derby Admin > Troubleshooting','adminHub']
+  };return map[id]||['Home','home'];
+}
+function ensureNav(d){
+  d.querySelectorAll('.page').forEach(p=>{
+    if(p.id==='home')return;
+    let nav=p.querySelector(':scope > .mnltNav');if(!nav){nav=d.createElement('div');nav.className='mnltNav';nav.innerHTML=`<div class="mnltNavLeft"><button class="btn mnltBack">← Back</button><button class="btn mnltHome">Home</button></div><div class="mnltCrumb"></div>`;p.insertBefore(nav,p.firstChild)}
+    const info=navInfo(p.id);nav.querySelector('.mnltCrumb').textContent=info[0];nav.querySelector('.mnltBack').onclick=()=>show(info[1]);nav.querySelector('.mnltHome').onclick=()=>show('home');
+  });
+}
+
+function renderSeparateRegistrationLists(d){
+  const panel=d.querySelector('#registration .grid2>div.panel:nth-child(2)');if(!panel)return;
+  let host=d.getElementById('v14DivisionLists');if(!host){host=d.createElement('div');host.id='v14DivisionLists';panel.appendChild(host)}
+  let s=null;try{s=JSON.parse(localStorage.getItem('mnltDerbyV2')||'null')}catch(e){}if(!s||!Array.isArray(s.registrations))return;
+  const stamp=String(s.updatedAt||'')+'|'+s.registrations.length+'|'+s.registrations.map(r=>[r.id,r.status,r.division,r.tradNo,r.modNo,r.tradCar,r.modCar].join(':')).join('|');if(stamp===lastRegStamp)return;lastRegStamp=stamp;
+  const active=s.registrations.filter(r=>r.status!=='Withdrawn');const trad=active.filter(r=>r.division==='Traditional'||r.division==='Both').sort((a,b)=>(a.tradNo||9999)-(b.tradNo||9999));const mod=active.filter(r=>r.division==='Modified'||r.division==='Both').sort((a,b)=>(a.modNo||9999)-(b.modNo||9999));
+  const rows=(arr,type)=>arr.length?arr.map(r=>`<div class="mnltRegRow"><div class="mnltRegTop"><div><div class="mnltRegName">${type==='T'?'#'+r.tradNo:'M'+r.modNo} ${escapeHtml(r.name)}</div><div class="mnltSmall">${escapeHtml(type==='T'?(r.tradCar||'Car name not entered'):(r.modCar||'Car name not entered'))} • ${escapeHtml(r.status||'Registered')}</div></div><button class="btn v14Edit" data-id="${r.id}">Edit</button></div></div>`).join(''):'<p class="muted">No racers in this division.</p>';
+  host.innerHTML=`<div class="countbar"><span class="pill">${trad.length} Traditional Racers</span><span class="pill">${mod.length} Modified Racers</span></div><div class="mnltSplit"><div class="mnltDivisionBox"><h3>Traditional Division</h3>${rows(trad,'T')}</div><div class="mnltDivisionBox"><h3>Modified Division</h3>${rows(mod,'M')}</div></div>`;
+  host.querySelectorAll('.v14Edit').forEach(b=>b.onclick=()=>{const w=getAppWin();if(w&&typeof w.editRegistration==='function')w.editRegistration(Number(b.dataset.id))});
+}
+function escapeHtml(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+
+function cleanExistingNav(d){
+  d.querySelectorAll('#registration .topbar .homeBtn,#traditionalHub .topbar .homeBtn,#modifiedHub .topbar .homeBtn,#racers .topbar button[data-page],#schedule .topbar button[data-page],#standings .topbar button[data-page],#data .topbar .homeBtn,#troubleshoot .topbar .homeBtn').forEach(b=>b.style.display='none');
+}
+
+function apply(){
+  const d=getAppDoc();if(!d)return;injectStyle(d);ensureExtraPages(d);rewriteHome(d);rewriteTraditionalHub(d);ensureNav(d);cleanExistingNav(d);renderSeparateRegistrationLists(d);const v=d.querySelector('.version');if(v)v.textContent='v14';d.title='MNLT Derby Manager v14';
+}
+shell.addEventListener('load',()=>{setTimeout(apply,150);setTimeout(apply,600)});setInterval(apply,400);
+})();
+</script>
+</body>
+</html>
