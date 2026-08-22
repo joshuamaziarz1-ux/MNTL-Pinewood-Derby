@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v11</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="app" title="MNLT Derby Manager v11"></iframe>
+<script>
+(function(){
+  'use strict';
+  const KEY='mnltDerbyV2';
+  const HIST='mnltDerbyV2History';
+  const MARK='mnltOfficialRegistrationsV11Seeded';
+  const sampleNames=new Set(['Alex Carter','Ben Walker','Caleb Reed','Daniel Brooks','Ethan Hall','Gabriel Stone','Isaac Young','Jacob Miller','Levi Adams','Micah Turner','Noah Davis','Samuel King']);
+
+  function shouldSeed(){
+    if(localStorage.getItem(MARK)==='1')return false;
+    let s=null;
+    try{s=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){}
+    if(!s)return true;
+    const names=[];
+    if(Array.isArray(s.registrations))s.registrations.forEach(r=>r&&r.name&&names.push(r.name));
+    if(Array.isArray(s.racers))s.racers.forEach(r=>r&&r.name&&names.push(r.name));
+    if(!names.length)return true;
+    return names.every(n=>sampleNames.has(n));
+  }
+
+  function buildOfficialData(){
+    const registrations=[
+      {id:11101,name:'Enoch Case',age:'',contact:'Val@caseplace.farm',division:'Both',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-07',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:1,modNo:1,tradRacerId:21101,modRacerId:31101},
+      {id:11102,name:'Elijah Case',age:'',contact:'Val@caseplace.farm',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-07',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:2,modNo:null,tradRacerId:21102,modRacerId:null},
+      {id:11103,name:'Jude Andrews',age:'',contact:'Seanericaandrews@gmail.com',division:'Both',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-09',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:3,modNo:2,tradRacerId:21103,modRacerId:31103},
+      {id:11104,name:'Tripp Kelsey',age:'',contact:'brianmkelsey@hotmail.com',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-10',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:4,modNo:null,tradRacerId:21104,modRacerId:null},
+      {id:11105,name:'Maran Kelsey',age:'',contact:'brianmkelsey@hotmail.com',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-10',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:5,modNo:null,tradRacerId:21105,modRacerId:null},
+      {id:11106,name:'Harmon Kelsey',age:'',contact:'brianmkelsey@hotmail.com',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-10',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:6,modNo:null,tradRacerId:21106,modRacerId:null},
+      {id:11107,name:'Samuel Morris',age:'',contact:'Lesliemorris1213@gmail.com',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-17',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:7,modNo:null,tradRacerId:21107,modRacerId:null},
+      {id:11108,name:'Eli Baird',age:'',contact:'trevor.joy.baird@gmail.com',division:'Traditional',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-20',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:8,modNo:null,tradRacerId:21108,modRacerId:null},
+      {id:11109,name:'Seth Baird',age:'',contact:'trevor.joy.baird@gmail.com',division:'Modified',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-21',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:null,modNo:3,tradRacerId:null,modRacerId:31109},
+      {id:11110,name:'Emma Haase',age:'',contact:'Haasemarina17@gmail.com',division:'Both',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-21',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:9,modNo:4,tradRacerId:21110,modRacerId:31110},
+      {id:11111,name:'Nehemiah Haase',age:'',contact:'Haasemarina17@gmail.com',division:'Both',tradCar:'',modCar:'',status:'Confirmed',date:'2026-08-21',notes:'Imported from official Pinewood Derby signup email.',rulesSent:true,tradNo:10,modNo:5,tradRacerId:21111,modRacerId:31111}
+    ];
+
+    const racers=[
+      {id:21101,registrationId:11101,name:'Enoch Case',car:'',division:'Traditional',number:1},
+      {id:21102,registrationId:11102,name:'Elijah Case',car:'',division:'Traditional',number:2},
+      {id:21103,registrationId:11103,name:'Jude Andrews',car:'',division:'Traditional',number:3},
+      {id:21104,registrationId:11104,name:'Tripp Kelsey',car:'',division:'Traditional',number:4},
+      {id:21105,registrationId:11105,name:'Maran Kelsey',car:'',division:'Traditional',number:5},
+      {id:21106,registrationId:11106,name:'Harmon Kelsey',car:'',division:'Traditional',number:6},
+      {id:21107,registrationId:11107,name:'Samuel Morris',car:'',division:'Traditional',number:7},
+      {id:21108,registrationId:11108,name:'Eli Baird',car:'',division:'Traditional',number:8},
+      {id:21110,registrationId:11110,name:'Emma Haase',car:'',division:'Traditional',number:9},
+      {id:21111,registrationId:11111,name:'Nehemiah Haase',car:'',division:'Traditional',number:10}
+    ];
+
+    const modifiedRacers=[
+      {id:31101,registrationId:11101,name:'Enoch Case',car:'',division:'Modified',number:1},
+      {id:31103,registrationId:11103,name:'Jude Andrews',car:'',division:'Modified',number:2},
+      {id:31109,registrationId:11109,name:'Seth Baird',car:'',division:'Modified',number:3},
+      {id:31110,registrationId:11110,name:'Emma Haase',car:'',division:'Modified',number:4},
+      {id:31111,registrationId:11111,name:'Nehemiah Haase',car:'',division:'Modified',number:5}
+    ];
+
+    return {
+      raceType:'Traditional',
+      registrations:registrations,
+      racers:racers,
+      heats:[],
+      current:0,
+      displayMode:'race',
+      updatedAt:Date.now(),
+      tieBreaks:{},
+      runoff:null,
+      modified:{racers:modifiedRacers,heats:[],current:0,displayMode:'race',tieBreaks:{},runoff:null},
+      officialRegistrationImportVersion:11
+    };
+  }
+
+  if(shouldSeed()){
+    localStorage.setItem(KEY,JSON.stringify(buildOfficialData()));
+    localStorage.removeItem(HIST);
+    localStorage.setItem(MARK,'1');
+  }
+
+  const frame=document.getElementById('app');
+  frame.src='index.html?v=11-1145';
+  frame.addEventListener('load',function(){
+    try{
+      const d=frame.contentDocument;
+      const v=d&&d.querySelector('.version');
+      if(v)v.textContent='v11';
+      if(d)d.title='MNLT Derby Manager v11';
+    }catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
