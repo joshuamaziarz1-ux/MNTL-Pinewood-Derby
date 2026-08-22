@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v12</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v12" src="v11.html?v=12-1153"></iframe>
+<script>
+(function(){
+  'use strict';
+  const shell=document.getElementById('shell');
+
+  function getAppDoc(){
+    try{
+      const shellDoc=shell.contentDocument;
+      const app=shellDoc&&shellDoc.getElementById('app');
+      return app&&app.contentDocument ? app.contentDocument : null;
+    }catch(e){return null}
+  }
+
+  function applyBackButtons(){
+    const d=getAppDoc();
+    if(!d)return;
+
+    const v=d.querySelector('.version');
+    if(v)v.textContent='v12';
+    d.title='MNLT Derby Manager v12';
+
+    d.querySelectorAll('button').forEach(function(b){
+      const t=(b.textContent||'').trim();
+      if(t==='Home'||t==='Traditional Home'){
+        b.textContent='← Back';
+        b.setAttribute('aria-label','Back');
+      }
+    });
+  }
+
+  shell.addEventListener('load',function(){
+    applyBackButtons();
+    setTimeout(applyBackButtons,250);
+    setTimeout(applyBackButtons,750);
+  });
+
+  setInterval(applyBackButtons,500);
+})();
+</script>
+</body>
+</html>
