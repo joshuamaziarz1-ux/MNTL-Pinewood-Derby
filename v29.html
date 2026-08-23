@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b1522">
+<title>MNLT Derby Manager v29</title>
+<style>
+*{box-sizing:border-box}
+:root{--bg:#0b1522;--panel:#142338;--panel2:#0e1c2c;--line:#30465f;--text:#f4f7fb;--muted:#9dafc1;--gold:#d8a63d;--green:#2e8050;--red:#8d3541}
+html,body{margin:0;min-height:100%;background:var(--bg);color:var(--text);font-family:Arial,sans-serif}
+button,input,select,textarea{font:inherit}
+button{touch-action:manipulation}
+header{background:#13243a;border-bottom:3px solid var(--gold);padding:14px 20px;position:sticky;top:0;z-index:20}
+.brand{font-size:26px;font-weight:1000}
+.wrap{max-width:1400px;margin:auto;padding:16px}
+.page{display:none}.page.active{display:block}
+.panel{background:var(--panel);border:1px solid #2d435d;border-radius:12px;padding:16px;margin-bottom:14px}
+.btn,.menu{border:0;border-radius:9px;cursor:pointer;font-weight:900;color:#fff;background:#2a405a}
+.btn{padding:11px 15px}.btn:hover,.menu:hover{filter:brightness(1.1)}
+.btn.primary{background:var(--gold);color:#111820}.btn.good{background:var(--green)}.btn.danger{background:var(--red)}
+.btn:disabled,.disabled{opacity:.42;cursor:not-allowed!important;filter:none!important}
+.menu{padding:22px 14px;font-size:21px;min-height:88px}
+h1,h2,h3{margin-top:0}.muted{color:var(--muted)}.hidden{display:none!important}
+.homeGrid,.raceChoice,.stepGrid,.cards2,.summary4,.summary3{display:grid;gap:12px}
+.homeGrid,.raceChoice,.stepGrid,.cards2{grid-template-columns:1fr 1fr}
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin-bottom:12px}
+.navBtns{display:flex;gap:8px;flex-wrap:wrap}.crumb{color:var(--muted);font-weight:800}
+.step{display:flex;align-items:center;gap:12px;background:var(--panel2);border:1px solid var(--line);border-radius:12px;padding:14px;min-height:72px;cursor:pointer}
+.stepNum{width:40px;height:40px;border-radius:50%;background:var(--gold);color:#111820;font-size:20px;font-weight:1000;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+.stepTitle{font-size:20px;font-weight:1000}
+.summary4{grid-template-columns:repeat(4,1fr);margin:12px 0 16px}.summary3{grid-template-columns:repeat(3,1fr);margin:12px 0 16px}
+.stat{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;text-align:center}.stat b{display:block;font-size:26px}.stat span{color:var(--muted);font-size:12px;font-weight:900;text-transform:uppercase}
+.grid2{display:grid;grid-template-columns:minmax(0,1fr) minmax(320px,.9fr);gap:14px}
+.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+label{display:block;font-weight:800;margin-top:5px}
+input,select,textarea{width:100%;padding:11px;margin:5px 0 9px;border-radius:8px;border:1px solid #41566e;background:#0d1b2b;color:#fff}
+textarea{min-height:80px;resize:vertical}
+.checkline{display:flex;align-items:center;gap:8px}.checkline input{width:auto;margin:0}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.rowCard{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;margin:8px 0}
+.rowTop{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.rowName{font-size:19px;font-weight:1000}.rowMeta{color:var(--muted);font-size:14px;margin-top:3px}
+.pills{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.pill{background:#243b56;border-radius:999px;padding:5px 8px;font-size:12px;font-weight:900}
+.green{color:#9ee7af}.red{color:#ff9da7}.gold{color:#f0c55d}
+.checkRow{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;background:var(--panel2);border:2px solid var(--line);border-radius:11px;padding:13px;margin:8px 0}.checkRow.checked{border-color:#4e9b67;background:#10271d}.checkRow.noshow{border-color:#8d4a54;background:#29171b}
+.checkActions{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.inspectTop{display:grid;grid-template-columns:minmax(260px,1fr) auto;gap:12px;align-items:end}
+.inspectForm{margin-top:14px;background:var(--panel2);border:2px solid var(--line);border-radius:12px;padding:14px}
+.inspectHead{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}.inspectName{font-size:24px;font-weight:1000}
+.weightBox{display:grid;grid-template-columns:minmax(180px,250px) 1fr;gap:12px;align-items:center;background:#13243a;border-radius:10px;padding:12px;margin:12px 0}.weightBox input{font-size:25px;font-weight:1000;margin:0}
+.checkItem{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;padding:9px 0;border-bottom:1px solid var(--line)}.checkItem:last-child{border-bottom:0}.checkBtns{display:flex;gap:6px}.checkBtns .btn{padding:8px 12px}.passSel{background:var(--green)!important}.failSel{background:var(--red)!important}
+.bucketGrid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:14px}.bucket{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:12px}.bucket h3{margin-bottom:8px}
+.photo{max-width:100%;max-height:260px;border-radius:9px;display:block;margin:10px auto}.file{display:none!important}
+.cardWorkspace{display:grid;grid-template-columns:minmax(300px,420px) 1fr;gap:18px;align-items:start}.raceCard{width:min(100%,390px);aspect-ratio:5/7;background:linear-gradient(145deg,#101d2d,#0b1522 58%,#18263a);border:3px solid var(--gold);border-radius:18px;overflow:hidden;position:relative;margin:auto}.cardCheck{height:24px;background:repeating-conic-gradient(#e5e8ec 0 25%,#1a2635 0 50%) 0/24px 24px;border-bottom:3px solid var(--gold)}.cardHero{height:58%;background:radial-gradient(circle,#20334d,#0b1522);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}.cardHero img{width:100%;height:100%;object-fit:cover}.cardNoPhoto{color:#8fa3b8;font-size:18px;font-weight:900;padding:28px;text-align:center}.cardNo{position:absolute;top:14px;left:14px;z-index:2;background:var(--gold);color:#111820;font-size:34px;font-weight:1000;padding:9px 12px;border-radius:9px}.cardInfo{padding:15px 18px}.cardCar{font-size:25px;font-weight:1000;color:#f0c55d;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.cardRacer{font-size:21px;font-weight:1000;margin-top:5px}.cardMeta{display:flex;justify-content:space-between;gap:10px;margin-top:12px;color:var(--muted);font-weight:800}.cardEvent{position:absolute;bottom:7px;left:15px;right:15px;text-align:center;color:#6f859a;font-size:11px;font-weight:900;letter-spacing:1px}
+.scheduleHeat,.controlLane{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:11px;margin:8px 0}.heatTitle{font-size:18px;font-weight:1000;margin-bottom:8px}.laneLine{display:grid;grid-template-columns:75px 80px 1fr;gap:10px;padding:7px 0;border-bottom:1px solid #253b53}.laneLine:last-child{border-bottom:0}
+.controlTitle{text-align:center;font-size:30px;font-weight:1000;margin:4px 0 14px}.controlGrid{display:grid;grid-template-columns:1fr 330px;gap:14px}.finishBtn{width:100%;text-align:left;padding:14px;background:#13243a;border:2px solid var(--line);border-radius:10px;color:#fff;font-size:18px;font-weight:900;cursor:pointer;margin:6px 0}.finishBtn.picked{border-color:var(--gold);background:#2a3440}.finishPos{display:inline-block;min-width:44px;color:var(--gold)}
+table{width:100%;border-collapse:collapse}th,td{padding:9px;text-align:left;border-bottom:1px solid var(--line)}th{color:var(--muted)}
+.toast{position:fixed;right:16px;top:78px;z-index:1000;background:#d8a63d;color:#111820;border-radius:9px;padding:11px 14px;font-weight:1000;box-shadow:0 8px 24px #0008;display:none;max-width:360px}.toast.show{display:block}
+.version{position:fixed;left:8px;bottom:5px;color:#778a9d;font-size:12px}
+.projectorOnly header,.projectorOnly main{display:none!important}.projectorView{display:none;min-height:100vh;padding:24px;background:var(--bg)}.projectorOnly .projectorView{display:block}.projTitle{text-align:center;font-size:52px;font-weight:1000;margin:10px 0 22px}.projLane{display:grid;grid-template-columns:140px 100px 1fr;gap:14px;align-items:center;padding:20px;border-bottom:1px solid var(--line);font-size:30px}.projLane:last-child{border-bottom:0}.projPanel{max-width:1200px;margin:auto;background:var(--panel);border:2px solid #405873;border-radius:16px;overflow:hidden}.projHeader{text-align:center;background:#13243a;border-bottom:3px solid var(--gold);padding:14px;font-size:30px;font-weight:1000}
+@media(max-width:850px){.homeGrid,.raceChoice,.stepGrid,.cards2,.grid2,.bucketGrid,.cardWorkspace,.controlGrid{grid-template-columns:1fr}.summary4{grid-template-columns:1fr 1fr}.inspectTop,.weightBox,.checkItem,.checkRow{grid-template-columns:1fr}.checkActions{justify-content:flex-start}.formGrid{grid-template-columns:1fr}.nav{align-items:flex-start;flex-direction:column}.crumb{font-size:13px}.wrap{padding:10px}.menu{min-height:74px}.projTitle{font-size:36px}.projLane{grid-template-columns:90px 65px 1fr;font-size:22px}}
+</style>
+</head>
+<body>
+<header><div class="brand">MNLT DERBY MANAGER</div></header>
+<main class="wrap" id="app">
+<section id="home" class="page active"><div class="panel"><h2>MNLT Derby Manager</h2><div class="homeGrid"><button class="menu" data-go="registration">Registration</button><button class="menu" data-go="raceDay">Race Day</button><button class="menu" data-go="projectorHub">Projector</button><button class="menu" data-go="admin">Admin</button></div></div></section>
+
+<section id="registration" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="home">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Registration</div></div><div class="grid2"><div class="panel"><h2 id="regTitle">Add Registration</h2><div class="formGrid"><div><label>Racer Name</label><input id="regName"></div><div><label>Age</label><input id="regAge" type="number" min="0"></div><div><label>Email / Phone</label><input id="regContact"></div><div><label>Race Entry</label><select id="regDivision"><option>Traditional</option><option>Modified</option><option>Both</option></select></div><div><label>Traditional Car Name</label><input id="regTradCar"></div><div><label>Modified Car Name</label><input id="regModCar"></div><div><label>Status</label><select id="regStatus"><option>Registered</option><option>Confirmed</option><option>Withdrawn</option></select></div><div><label>Date</label><input id="regDate" type="date"></div></div><label>Notes</label><textarea id="regNotes"></textarea><label class="checkline"><input id="regRules" type="checkbox"> Rules sent</label><div class="actions"><button class="btn primary" id="saveReg">Add Racer</button><button class="btn hidden" id="cancelReg">Cancel</button></div><div id="regMsg" class="muted" style="margin-top:8px"></div></div><div class="panel"><h2>Racers</h2><div id="regCounts" class="pills"></div><div id="regList"></div></div></div></section>
+
+<section id="raceDay" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="home">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day</div></div><div class="panel"><h2>Race Day</h2><div class="raceChoice"><button class="menu" data-go="tradHub">Traditional Race</button><button class="menu" data-go="modHub">Modified Race</button></div></div></section>
+
+<section id="tradHub" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="raceDay">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day › Traditional</div></div><div class="panel"><h2>Traditional Race</h2><div id="tradStats" class="summary4"></div><div class="stepGrid" id="tradSteps"></div></div></section>
+<section id="modHub" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="raceDay">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day › Modified</div></div><div class="panel"><h2>Modified Race</h2><div id="modStats" class="summary4"></div><div class="stepGrid" id="modSteps"></div></div></section>
+
+<section id="racersPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" id="racersBack">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb" id="racersCrumb"></div></div><div class="panel"><h2 id="racersTitle">Racers</h2><div id="racerList"></div></div></section>
+<section id="checkinPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" id="checkBack">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb" id="checkCrumb"></div></div><div class="panel"><h2 id="checkTitle">Check-In</h2><div id="checkStats" class="summary3"></div><div id="checkList"></div></div></section>
+<section id="inspectPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" id="inspectBack">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb" id="inspectCrumb"></div></div><div class="panel"><h2 id="inspectTitle">Inspection & Car Photo</h2><div id="inspectBody"></div></div></section>
+<section id="cardsPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" id="cardsBack">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb" id="cardsCrumb"></div></div><div class="panel"><div id="cardsBody"></div></div></section>
+
+<section id="generatePage" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="tradHub">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day › Traditional › Generate Race</div></div><div class="panel"><h2>Generate Race</h2><div id="generateBody"></div></div></section>
+<section id="controlPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="tradHub">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day › Traditional › Race Control</div></div><div id="controlBody"></div></section>
+<section id="resultsPage" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="tradHub">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Race Day › Traditional › Results</div></div><div class="panel"><h2>Results</h2><div id="resultsBody"></div></div></section>
+
+<section id="projectorHub" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="home">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Projector</div></div><div class="panel"><h2>Projector</h2><div class="raceChoice"><button class="menu" id="preRace">Pre-Race Slideshow</button><button class="menu" id="liveProjector">Live Race Display</button></div></div></section>
+<section id="admin" class="page"><div class="nav"><div class="navBtns"><button class="btn" data-back="home">← Back</button><button class="btn" data-go="home">Home</button></div><div class="crumb">Home › Admin</div></div><div class="panel"><h2>Backup & Restore</h2><div class="actions"><button class="btn primary" id="saveDerby">Save Derby</button><button class="btn" id="loadDerby">Load Derby</button><input class="file" type="file" id="loadDerbyFile" accept=".json,application/json"><button class="btn" id="undoMajor">Undo Last Change</button><button class="btn danger" id="resetDerby">Reset Derby</button></div><p class="muted">Car photos stay on this device and are not included in the JSON backup.</p></div></section>
+</main>
+<section id="projectorView" class="projectorView"></section>
+<div class="toast" id="toast"></div><div class="version">v29 BASE</div>
+
+<script>
+'use strict';
+const KEY='mnltDerbyV2',HIST='mnltDerbyV2History',DB='mnltDerbyMedia',STORE='photos';
+const $=id=>document.getElementById(id);
+let S=null,editingRegId=null,currentDivision='trad',inspectSelected={trad:null,mod:null},cardSelected={trad:null,mod:null},finishPicks=[];
+let bc=null;
+try{bc=new BroadcastChannel('mnltDerbyLive')}catch(e){}
+const tradItems=[['length','Length 7.0 in maximum'],['width','Overall width 2 3/4 in maximum'],['clearance','Underbody clearance at least 3/8 in'],['height','Clears finish-line / timer'],['body','Main body pine only'],['wheels','Official BSA Grand Prix wheels'],['axles','Official BSA Grand Prix axles'],['wheelMods','Wheel modifications polishing / smoothing only'],['axleMods','Axle modifications deburring / polishing only'],['fourWheels','All 4 wheels touch'],['noHardware','No bearings, washers, bushings, or springs'],['dryLube','Dry lubricant only'],['secureWeights','Weights securely attached'],['gravity','Gravity powered only'],['trackSafe','Safe for the track']];
+const modItems=[['trackSafe','Will not damage the track'],['noBurning','No burning, flame, or track-damaging effect'],['secure','Parts and weights securely attached']];
+
+function freshModified(){return{racers:[],heats:[],current:0,displayMode:'race',tieBreaks:{},runoff:null}}
+function fresh(){return{raceType:'Traditional',registrations:[],racers:[],heats:[],current:0,displayMode:'race',updatedAt:Date.now(),tieBreaks:{},runoff:null,modified:freshModified()}}
+function ensureState(){
+ if(!S||typeof S!=='object')S=fresh();
+ if(!Array.isArray(S.registrations))S.registrations=[];
+ if(!Array.isArray(S.racers))S.racers=[];
+ if(!Array.isArray(S.heats))S.heats=[];
+ if(!S.modified||typeof S.modified!=='object')S.modified=freshModified();
+ if(!Array.isArray(S.modified.racers))S.modified.racers=[];
+ if(!Array.isArray(S.modified.heats))S.modified.heats=[];
+ S.registrations.forEach(r=>{if(!r.status)r.status='Registered';if(!r.tradCheckIn)r.tradCheckIn='waiting';if(!r.modCheckIn)r.modCheckIn='waiting'});
+}
+try{S=JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){} ensureState();
+
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');clearTimeout(t._tm);t._tm=setTimeout(()=>t.classList.remove('show'),2600)}
+function snapshot(){try{return JSON.parse(JSON.stringify(S))}catch(e){return null}}
+function pushHistory(){const snap=snapshot();if(!snap)return;let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};h.push(snap);if(h.length>25)h=h.slice(-25);localStorage.setItem(HIST,JSON.stringify(h))}
+function broadcast(){try{bc&&bc.postMessage({updatedAt:S.updatedAt})}catch(e){}}
+function persist(){S.updatedAt=Date.now();localStorage.setItem(KEY,JSON.stringify(S));renderVisible();broadcast()}
+function mutate(fn,major=true){if(major)pushHistory();fn();persist()}
+function show(id){document.querySelectorAll('.page').forEach(p=>p.classList.toggle('active',p.id===id));window.scrollTo(0,0);renderVisible()}
+document.addEventListener('click',e=>{const g=e.target.closest('[data-go]');if(g)show(g.dataset.go);const b=e.target.closest('[data-back]');if(b)show(b.dataset.back)});
+function divName(type){return type==='trad'?'Traditional':'Modified'}
+function divMatch(r,type){return r.status!=='Withdrawn'&&(type==='trad'?(r.division==='Traditional'||r.division==='Both'):(r.division==='Modified'||r.division==='Both'))}
+function divRegs(type){return S.registrations.filter(r=>divMatch(r,type)).sort((a,b)=>((type==='trad'?a.tradNo:a.modNo)||9999)-((type==='trad'?b.tradNo:b.modNo)||9999)||String(a.name).localeCompare(String(b.name)))}
+function ciField(type){return type==='trad'?'tradCheckIn':'modCheckIn'}
+function insField(type){return type==='trad'?'tradInspection':'modInspection'}
+function cardField(type){return type==='trad'?'tradRaceCard':'modRaceCard'}
+function numLabel(r,type){if(type==='trad')return '#'+(r.tradNo||'');const n=String(r.modNo||'');return n.toUpperCase().startsWith('M')?n:'M'+n}
+function carName(r,type){return type==='trad'?(r.tradCar||'Unnamed Car'):(r.modCar||'Unnamed Car')}
+function nextNumber(field){return S.registrations.reduce((m,r)=>Math.max(m,Number(r[field])||0),0)+1}
+function clearTraditionalRace(){S.heats=[];S.current=0;S.displayMode='race';S.tieBreaks={};S.runoff=null;finishPicks=[]}
+function syncRegEntries(reg){
+ const active=reg.status!=='Withdrawn',entersTrad=active&&(reg.division==='Traditional'||reg.division==='Both'),entersMod=active&&(reg.division==='Modified'||reg.division==='Both');
+ let tr=reg.tradRacerId?S.racers.find(r=>r.id===reg.tradRacerId):null;
+ if(entersTrad){if(!reg.tradNo)reg.tradNo=nextNumber('tradNo');if(!tr){reg.tradRacerId=Date.now()+Math.floor(Math.random()*100000);tr={id:reg.tradRacerId,registrationId:reg.id};S.racers.push(tr)}Object.assign(tr,{registrationId:reg.id,name:reg.name,car:reg.tradCar||'',division:'Traditional',number:reg.tradNo})}
+ else if(tr){S.racers=S.racers.filter(x=>x.id!==tr.id);reg.tradRacerId=null}
+ let mr=reg.modRacerId?S.modified.racers.find(r=>r.id===reg.modRacerId):null;
+ if(entersMod){if(!reg.modNo)reg.modNo=nextNumber('modNo');if(!mr){reg.modRacerId=Date.now()+Math.floor(Math.random()*100000);mr={id:reg.modRacerId,registrationId:reg.id};S.modified.racers.push(mr)}Object.assign(mr,{registrationId:reg.id,name:reg.name,car:reg.modCar||'',division:'Modified',number:reg.modNo})}
+ else if(mr){S.modified.racers=S.modified.racers.filter(x=>x.id!==mr.id);reg.modRacerId=null}
+}
+
+function resetRegForm(){editingRegId=null;$('regTitle').textContent='Add Registration';$('saveReg').textContent='Add Racer';$('cancelReg').classList.add('hidden');['regName','regAge','regContact','regTradCar','regModCar','regNotes'].forEach(id=>$(id).value='');$('regDivision').value='Traditional';$('regStatus').value='Registered';$('regDate').value=new Date().toISOString().slice(0,10);$('regRules').checked=false;updateDivisionFields();$('regMsg').textContent=''}
+function updateDivisionFields(){const v=$('regDivision').value;$('regTradCar').disabled=v==='Modified';$('regModCar').disabled=v==='Traditional'}
+$('regDivision').addEventListener('change',updateDivisionFields);
+function regDuplicate(name,id){const n=name.trim().toLowerCase();return S.registrations.find(r=>r.id!==id&&String(r.name||'').trim().toLowerCase()===n)}
+function saveRegistration(){
+ const name=$('regName').value.trim();if(!name){$('regMsg').textContent='Enter the racer name.';return}
+ const dup=regDuplicate(name,editingRegId);if(dup){$('regMsg').textContent='That racer is already registered.';return}
+ const division=$('regDivision').value;const old=editingRegId?S.registrations.find(r=>r.id===editingRegId):null;const affectsTrad=!!(old?.tradRacerId)||(division==='Traditional'||division==='Both');
+ mutate(()=>{let r=old;if(!r){r={id:Date.now()+Math.floor(Math.random()*100000),tradNo:null,modNo:null,tradRacerId:null,modRacerId:null};S.registrations.push(r)}
+ Object.assign(r,{name,age:$('regAge').value.trim(),contact:$('regContact').value.trim(),division,tradCar:$('regTradCar').value.trim(),modCar:$('regModCar').value.trim(),status:$('regStatus').value,date:$('regDate').value||new Date().toISOString().slice(0,10),notes:$('regNotes').value.trim(),rulesSent:$('regRules').checked});
+ if(!r.tradCheckIn)r.tradCheckIn='waiting';if(!r.modCheckIn)r.modCheckIn='waiting';syncRegEntries(r);if(affectsTrad&&S.heats.length)clearTraditionalRace()});
+ resetRegForm();toast('Registration saved.');
+}
+$('saveReg').onclick=saveRegistration;$('cancelReg').onclick=resetRegForm;
+function editRegistration(id){const r=S.registrations.find(x=>x.id===id);if(!r)return;editingRegId=id;$('regTitle').textContent='Edit Registration';$('saveReg').textContent='Save Changes';$('cancelReg').classList.remove('hidden');$('regName').value=r.name||'';$('regAge').value=r.age||'';$('regContact').value=r.contact||'';$('regDivision').value=r.division||'Traditional';$('regTradCar').value=r.tradCar||'';$('regModCar').value=r.modCar||'';$('regStatus').value=r.status||'Registered';$('regDate').value=r.date||new Date().toISOString().slice(0,10);$('regNotes').value=r.notes||'';$('regRules').checked=!!r.rulesSent;updateDivisionFields();window.scrollTo(0,0)}
+let deleteArmed=null;
+function deleteRegistration(id,btn){if(deleteArmed!==id){deleteArmed=id;btn.textContent='CLICK AGAIN TO DELETE';setTimeout(()=>{if(deleteArmed===id){deleteArmed=null;renderRegistration()}},3500);return}deleteArmed=null;const r=S.registrations.find(x=>x.id===id);if(!r)return;mutate(()=>{if(r.tradRacerId)S.racers=S.racers.filter(x=>x.id!==r.tradRacerId);if(r.modRacerId)S.modified.racers=S.modified.racers.filter(x=>x.id!==r.modRacerId);S.registrations=S.registrations.filter(x=>x.id!==id);if(r.tradRacerId)clearTraditionalRace()});toast('Registration deleted.')}
+function renderRegistration(){
+ const active=S.registrations.filter(r=>r.status!=='Withdrawn'),trad=active.filter(r=>divMatch(r,'trad')).length,mod=active.filter(r=>divMatch(r,'mod')).length;
+ $('regCounts').innerHTML=`<span class="pill">${active.length} Active</span><span class="pill">${trad} Traditional</span><span class="pill">${mod} Modified</span>`;
+ $('regList').innerHTML=S.registrations.length?'':'<p class="muted">No racers yet.</p>';
+ S.registrations.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name))).forEach(r=>{const d=document.createElement('div');d.className='rowCard';const nums=[];if(divMatch(r,'trad'))nums.push('Traditional #'+r.tradNo);if(divMatch(r,'mod'))nums.push('Modified '+numLabel(r,'mod'));d.innerHTML=`<div class="rowTop"><div><div class="rowName">${esc(r.name)}</div><div class="rowMeta">${esc(r.division)}${r.contact?' • '+esc(r.contact):''}</div><div class="pills">${nums.map(n=>`<span class="pill">${esc(n)}</span>`).join('')}<span class="pill">${esc(r.status)}</span></div>${r.tradCar&&divMatch(r,'trad')?`<div class="rowMeta">Traditional: ${esc(r.tradCar)}</div>`:''}${r.modCar&&divMatch(r,'mod')?`<div class="rowMeta">Modified: ${esc(r.modCar)}</div>`:''}</div><div class="actions"><button class="btn edit">Edit</button><button class="btn danger del">${deleteArmed===r.id?'CLICK AGAIN TO DELETE':'Delete'}</button></div></div>`;d.querySelector('.edit').onclick=()=>editRegistration(r.id);d.querySelector('.del').onclick=e=>deleteRegistration(r.id,e.target);$('regList').appendChild(d)})
+}
+
+function stats(type){const arr=divRegs(type);return{racers:arr.length,checked:arr.filter(r=>r[ciField(type)]==='checked').length,approved:arr.filter(r=>r[insField(type)]?.approved).length,cards:arr.filter(r=>r[cardField(type)]?.saved).length}}
+function statHtml(x){return `<div class="stat"><b>${x.racers}</b><span>Racers</span></div><div class="stat"><b>${x.checked}</b><span>Checked In</span></div><div class="stat"><b>${x.approved}</b><span>Approved</span></div><div class="stat"><b>${x.cards}</b><span>Cards</span></div>`}
+function renderHubs(){
+ $('tradStats').innerHTML=statHtml(stats('trad'));$('modStats').innerHTML=statHtml(stats('mod'));
+ const steps=['Racers','Check-In','Inspection','Race Cards','Generate Race','Race Control','Results'];
+ $('tradSteps').innerHTML=steps.map((t,i)=>`<div class="step" data-step="${i+1}"><div class="stepNum">${i+1}</div><div class="stepTitle">${t}</div></div>`).join('');
+ $('tradSteps').querySelectorAll('.step').forEach(s=>s.onclick=()=>openStep('trad',Number(s.dataset.step)));
+ $('modSteps').innerHTML=steps.map((t,i)=>`<div class="step ${i>=4?'disabled':''}" data-step="${i+1}"><div class="stepNum">${i+1}</div><div class="stepTitle">${t}</div></div>`).join('');
+ $('modSteps').querySelectorAll('.step').forEach(s=>{if(Number(s.dataset.step)<=4)s.onclick=()=>openStep('mod',Number(s.dataset.step))});
+}
+function openStep(type,n){currentDivision=type;if(n===1)openRacers(type);if(n===2)openCheckin(type);if(n===3)openInspection(type);if(n===4)openCards(type);if(type==='trad'&&n===5){show('generatePage');renderGenerate()}if(type==='trad'&&n===6){show('controlPage');renderControl()}if(type==='trad'&&n===7){show('resultsPage');renderResults()}}
+function openRacers(type){currentDivision=type;$('racersBack').onclick=()=>show(type==='trad'?'tradHub':'modHub');$('racersCrumb').textContent=`Home › Race Day › ${divName(type)} › Racers`;$('racersTitle').textContent=`${divName(type)} Racers`;show('racersPage');renderRacers()}
+function renderRacers(){const arr=divRegs(currentDivision);$('racerList').innerHTML=arr.length?arr.map(r=>`<div class="rowCard"><div class="rowName">${numLabel(r,currentDivision)} ${esc(r.name)}</div><div class="rowMeta">${esc(carName(r,currentDivision))}</div></div>`).join(''):'<p class="muted">No racers in this division.</p>'}
+
+function openCheckin(type){currentDivision=type;$('checkBack').onclick=()=>show(type==='trad'?'tradHub':'modHub');$('checkCrumb').textContent=`Home › Race Day › ${divName(type)} › Check-In`;$('checkTitle').textContent=`${divName(type)} Check-In`;show('checkinPage');renderCheckin()}
+function setCheck(type,id,value){const r=S.registrations.find(x=>x.id===id);if(!r)return;mutate(()=>{r[ciField(type)]=value;if(type==='trad'&&S.heats.length)clearTraditionalRace()});if(type==='trad')toast('Check-In updated. Race schedule cleared if needed.');}
+function renderCheckin(){const arr=divRegs(currentDivision),field=ciField(currentDivision),checked=arr.filter(r=>r[field]==='checked').length,waiting=arr.filter(r=>(r[field]||'waiting')==='waiting').length,noShow=arr.filter(r=>r[field]==='no-show').length;$('checkStats').innerHTML=`<div class="stat"><b>${checked}</b><span>Checked In</span></div><div class="stat"><b>${waiting}</b><span>Waiting</span></div><div class="stat"><b>${noShow}</b><span>No Show</span></div>`;$('checkList').innerHTML=arr.length?'':'<p class="muted">No racers in this division.</p>';arr.forEach(r=>{const st=r[field]||'waiting',d=document.createElement('div');d.className='checkRow '+(st==='checked'?'checked':st==='no-show'?'noshow':'');d.innerHTML=`<div><div class="rowName">${numLabel(r,currentDivision)} ${esc(r.name)}</div><div class="rowMeta">${esc(carName(r,currentDivision))}</div></div><div class="checkActions">${st==='checked'?'<b class="green">✓ CHECKED IN</b><button class="btn undo">Undo</button>':st==='no-show'?'<b class="red">NO SHOW</b><button class="btn undo">Undo</button>':'<button class="btn good in">CHECK IN</button><button class="btn danger no">NO SHOW</button>'}</div>`;d.querySelector('.in')?.addEventListener('click',()=>setCheck(currentDivision,r.id,'checked'));d.querySelector('.no')?.addEventListener('click',()=>setCheck(currentDivision,r.id,'no-show'));d.querySelector('.undo')?.addEventListener('click',()=>setCheck(currentDivision,r.id,'waiting'));$('checkList').appendChild(d)})}
+
+function openDb(){return new Promise((resolve,reject)=>{const q=indexedDB.open(DB,1);q.onupgradeneeded=()=>{if(!q.result.objectStoreNames.contains(STORE))q.result.createObjectStore(STORE)};q.onsuccess=()=>resolve(q.result);q.onerror=()=>reject(q.error)})}
+async function getPhoto(key){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readonly'),q=tx.objectStore(STORE).get(key);q.onsuccess=()=>resolve(q.result||null);q.onerror=()=>reject(q.error)})}
+async function putPhoto(key,blob){const db=await openDb();return new Promise((resolve,reject)=>{const tx=db.transaction(STORE,'readwrite');tx.objectStore(STORE).put(blob,key);tx.oncomplete=resolve;tx.onerror=()=>reject(tx.error)})}
+async function compressImage(file){const url=URL.createObjectURL(file);try{const img=await new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url});const max=1600,scale=Math.min(1,max/Math.max(img.naturalWidth,img.naturalHeight)),c=document.createElement('canvas');c.width=Math.max(1,Math.round(img.naturalWidth*scale));c.height=Math.max(1,Math.round(img.naturalHeight*scale));c.getContext('2d').drawImage(img,0,0,c.width,c.height);return await new Promise(res=>c.toBlob(b=>res(b||file),'image/jpeg',.86))}finally{URL.revokeObjectURL(url)}}
+function inspection(r,type){const x=r[insField(type)]||{};return{weight:x.weight??'',items:x.items||{},approved:!!x.approved,approvedAt:x.approvedAt||'',photoSaved:!!x.photoSaved,savedAt:x.savedAt||''}}
+function inspectRegs(type){return divRegs(type).filter(r=>r[ciField(type)]==='checked')}
+function inspectFailed(r,type){const x=inspection(r,type);if(x.approved)return false;return !!x.savedAt||Object.values(x.items).includes('fail')||(type==='trad'&&x.weight!==''&&Number(x.weight)>5)}
+function inspectAnswered(r,type){const x=inspection(r,type),items=type==='trad'?tradItems:modItems;if(!items.every(([k])=>x.items[k]==='pass'||x.items[k]==='fail'))return false;if(type==='trad'){const w=Number(x.weight);return x.weight!==''&&Number.isFinite(w)&&w>0}return true}
+function inspectPasses(r,type){const x=inspection(r,type),items=type==='trad'?tradItems:modItems;if(!items.every(([k])=>x.items[k]==='pass'))return false;if(type==='trad'){const w=Number(x.weight);return Number.isFinite(w)&&w>0&&w<=5}return true}
+function ensureInspection(r,type){const f=insField(type);if(!r[f])r[f]={weight:'',items:{},approved:false,approvedAt:'',photoSaved:false,savedAt:''};if(!r[f].items)r[f].items={};return r[f]}
+function openInspection(type){currentDivision=type;$('inspectBack').onclick=()=>show(type==='trad'?'tradHub':'modHub');$('inspectCrumb').textContent=`Home › Race Day › ${divName(type)} › Inspection`;$('inspectTitle').textContent=`${divName(type)} Inspection & Car Photo`;show('inspectPage');renderInspection()}
+function setInspectValue(type,id,key,value){const r=S.registrations.find(x=>x.id===id);if(!r)return;mutate(()=>{const x=ensureInspection(r,type);if(key==='weight')x.weight=value;else x.items[key]=value;x.approved=false;x.approvedAt=''},false);renderInspection()}
+function saveInspection(type,id){const r=S.registrations.find(x=>x.id===id);if(!r||!inspectAnswered(r,type))return;const ok=inspectPasses(r,type),now=new Date().toISOString();inspectSelected[type]=null;mutate(()=>{const x=ensureInspection(r,type);x.approved=ok;x.approvedAt=ok?now:'';x.savedAt=now});toast(ok?'Inspection passed. Take the car photo below.':'Inspection saved — needs correction.')}
+async function takePhoto(type,id,input){const f=input.files?.[0];if(!f)return;const r=S.registrations.find(x=>x.id===id);if(!r)return;try{const blob=await compressImage(f);await putPhoto(`${type}:${id}`,blob);mutate(()=>{const x=ensureInspection(r,type);x.photoSaved=true;const cf=cardField(type);if(!r[cf])r[cf]={saved:false,savedAt:''};r[cf].saved=false;r[cf].savedAt=''},false);toast('Car photo saved.')}catch(e){toast('Photo could not be saved.')}}
+async function appendPhoto(type,id,host){const blob=await getPhoto(`${type}:${id}`).catch(()=>null);if(!blob)return;const u=URL.createObjectURL(blob),img=document.createElement('img');img.className='photo';img.src=u;img.onload=()=>setTimeout(()=>URL.revokeObjectURL(u),800);host.appendChild(img)}
+function loadInspection(type,id){inspectSelected[type]=Number(id);renderInspection();setTimeout(()=>document.querySelector('.inspectForm')?.scrollIntoView({behavior:'smooth',block:'start'}),50)}
+function renderInspection(){
+ const type=currentDivision,arr=inspectRegs(type),passed=arr.filter(r=>inspection(r,type).approved),bad=arr.filter(r=>inspectFailed(r,type)),pending=arr.filter(r=>!inspection(r,type).approved&&!inspectFailed(r,type)),selected=arr.find(r=>r.id===inspectSelected[type])||null,items=type==='trad'?tradItems:modItems;
+ $('inspectBody').innerHTML=`<div class="inspectTop"><div><label>Racer</label><select id="inspectSelect"><option value="">Select racer...</option>${arr.map(r=>`<option value="${r.id}" ${selected?.id===r.id?'selected':''}>${numLabel(r,type)} ${esc(r.name)}${inspection(r,type).approved?' — PASSED':inspectFailed(r,type)?' — NEEDS FIX':''}</option>`).join('')}</select></div><div class="pills"><span class="pill">${pending.length} Waiting</span><span class="pill">${passed.length} Passed</span><span class="pill">${bad.length} Needs Fix</span></div></div><div id="inspectFormHost"></div><div class="bucketGrid"><div class="bucket"><h3>Passed</h3><div id="passedCars"></div></div><div class="bucket"><h3>Needs Fix</h3><div id="badCars"></div></div></div>`;
+ $('inspectSelect').onchange=e=>{inspectSelected[type]=e.target.value?Number(e.target.value):null;renderInspection()};
+ if(selected){const x=inspection(selected,type),answered=items.filter(([k])=>['pass','fail'].includes(x.items[k])).length,canSave=inspectAnswered(selected,type);let weight='';if(type==='trad'){const w=Number(x.weight),state=x.weight===''?'<span class="muted">Enter weight</span>':(w>0&&w<=5?'<span class="green">PASS</span>':'<span class="red">FAIL</span>');weight=`<div class="weightBox"><div><label>Weight (oz)</label><input id="weightInput" type="number" min="0" step="0.01" inputmode="decimal" value="${esc(x.weight)}" placeholder="0.00"></div><div style="font-size:20px;font-weight:1000">${state}</div></div>`}
+ $('inspectFormHost').innerHTML=`<div class="inspectForm"><div class="inspectHead"><div><div class="inspectName">${numLabel(selected,type)} ${esc(selected.name)}</div><div class="rowMeta">${esc(carName(selected,type))}</div></div><b class="gold">${answered} / ${items.length}</b></div>${weight}${items.map(([k,label])=>`<div class="checkItem"><div>${esc(label)}</div><div class="checkBtns"><button class="btn ${x.items[k]==='pass'?'passSel':''}" data-ik="${k}" data-iv="pass">PASS</button><button class="btn ${x.items[k]==='fail'?'failSel':''}" data-ik="${k}" data-iv="fail">FAIL</button></div></div>`).join('')}<div class="actions"><button class="btn primary" id="saveInspection" ${canSave?'':'disabled'}>SAVE INSPECTION</button></div></div>`;
+ if(type==='trad')$('weightInput').onchange=e=>setInspectValue(type,selected.id,'weight',e.target.value);
+ document.querySelectorAll('[data-ik]').forEach(b=>b.onclick=()=>setInspectValue(type,selected.id,b.dataset.ik,b.dataset.iv));$('saveInspection').onclick=()=>saveInspection(type,selected.id)}
+ const p=$('passedCars');p.innerHTML=passed.length?'':'<p class="muted">None yet.</p>';passed.forEach(r=>{const x=inspection(r,type),d=document.createElement('div');d.className='rowCard';d.innerHTML=`<div class="rowName">${numLabel(r,type)} ${esc(r.name)}</div><div class="rowMeta">${type==='trad'?'Weight '+esc(x.weight)+' oz • ':''}${x.photoSaved?'Photo saved':'Photo needed'}</div><div class="actions"><button class="btn good photoBtn">${x.photoSaved?'RETAKE PHOTO':'TAKE PHOTO'}</button><input class="file photoInput" type="file" accept="image/*" capture="environment"><button class="btn reinspect">Reinspect</button></div><div class="photoHost"></div>`;d.querySelector('.photoBtn').onclick=()=>d.querySelector('.photoInput').click();d.querySelector('.photoInput').onchange=e=>takePhoto(type,r.id,e.target);d.querySelector('.reinspect').onclick=()=>loadInspection(type,r.id);p.appendChild(d);if(x.photoSaved)appendPhoto(type,r.id,d.querySelector('.photoHost'))});
+ const b=$('badCars');b.innerHTML=bad.length?'':'<p class="muted">None.</p>';bad.forEach(r=>{const d=document.createElement('div');d.className='rowCard';d.innerHTML=`<div class="rowName">${numLabel(r,type)} ${esc(r.name)}</div><div class="actions"><button class="btn load">LOAD</button></div>`;d.querySelector('.load').onclick=()=>loadInspection(type,r.id);b.appendChild(d)})
+}
+
+function openCards(type){currentDivision=type;$('cardsBack').onclick=()=>show(type==='trad'?'tradHub':'modHub');$('cardsCrumb').textContent=`Home › Race Day › ${divName(type)} › Race Cards`;show('cardsPage');renderCards()}
+async function renderCards(){
+ const type=currentDivision,arr=divRegs(type).filter(r=>inspection(r,type).approved);if(!arr.some(r=>r.id===cardSelected[type]))cardSelected[type]=arr[0]?.id||null;const cur=arr.find(r=>r.id===cardSelected[type])||null,ready=arr.filter(r=>inspection(r,type).photoSaved),saved=arr.filter(r=>r[cardField(type)]?.saved);
+ $('cardsBody').innerHTML=`<div class="inspectTop"><div><h2>${divName(type)} Race Cards</h2></div><div><label>Racer</label><select id="cardSelect"><option value="">Select racer...</option>${arr.map(r=>`<option value="${r.id}" ${cur?.id===r.id?'selected':''}>${numLabel(r,type)} ${esc(r.name)}</option>`).join('')}</select></div></div><div class="summary3"><div class="stat"><b>${arr.length}</b><span>Approved</span></div><div class="stat"><b>${ready.length}</b><span>Photos</span></div><div class="stat"><b>${saved.length}</b><span>Cards</span></div></div><div id="cardWork"></div>`;
+ $('cardSelect').onchange=e=>{cardSelected[type]=e.target.value?Number(e.target.value):null;renderCards()};if(!cur){$('cardWork').innerHTML='<p class="muted">Approve a car in Inspection first.</p>';return}
+ const x=inspection(cur,type),cf=cur[cardField(type)]||{},work=$('cardWork'),weight=type==='trad'&&x.weight?`${Number(x.weight).toFixed(2)} oz`:'';
+ work.innerHTML=`<div class="cardWorkspace"><div class="raceCard"><div class="cardCheck"></div><div class="cardHero"><div class="cardNo">${numLabel(cur,type)}</div><div id="cardPhoto" class="cardNoPhoto">CAR PHOTO</div></div><div class="cardInfo"><div class="cardCar">${esc(carName(cur,type))}</div><div class="cardRacer">${esc(cur.name)}</div><div class="cardMeta"><span>${divName(type)}</span><span>${esc(weight)}</span></div></div><div class="cardEvent">MNLT Pinewood Derby • 2026</div></div><div class="panel"><h3>${cf.saved?'✓ Card Saved':'Race Card'}</h3><div class="actions"><button class="btn" id="cardPhotoBtn">${x.photoSaved?'REPLACE PHOTO':'ADD PHOTO'}</button><input class="file" id="cardFile" type="file" accept="image/*" capture="environment"><button class="btn good" id="saveCard" ${x.photoSaved?'':'disabled'}>SAVE CARD</button></div></div></div>`;
+ const blob=await getPhoto(`${type}:${cur.id}`).catch(()=>null);if(blob){const u=URL.createObjectURL(blob),host=$('cardPhoto');host.className='';host.innerHTML=`<img src="${u}" alt="Car photo">`;host.querySelector('img').onload=()=>setTimeout(()=>URL.revokeObjectURL(u),800)}
+ $('cardPhotoBtn').onclick=()=>$('cardFile').click();$('cardFile').onchange=e=>takePhoto(type,cur.id,e.target);$('saveCard').onclick=()=>{mutate(()=>{if(!cur[cardField(type)])cur[cardField(type)]={saved:false,savedAt:''};cur[cardField(type)].saved=true;cur[cardField(type)].savedAt=new Date().toISOString()},false);toast('Race card saved.')}
+}
+
+function eligibleTrad(){return divRegs('trad').filter(r=>r.tradCheckIn==='checked'&&inspection(r,'trad').approved)}
+function buildFairSchedule(ids){
+ const heats=[];let heatId=1;
+ for(let round=0;round<4;round++){
+  const buckets=[[],[],[],[]];
+  ids.forEach((id,i)=>buckets[(i+round)%4].push(id));
+  buckets.forEach((b,l)=>{if(b.length>1){const shift=(round+l)%b.length;buckets[l]=b.slice(shift).concat(b.slice(0,shift))}});
+  const heatCount=Math.max(0,...buckets.map(b=>b.length));
+  for(let h=0;h<heatCount;h++)heats.push({id:heatId++,round:round+1,lanes:buckets.map(b=>b[h]||null),results:[]});
+ }
+ return heats
+}
+function verifySchedule(heats,ids){const ok=ids.every(id=>{const seen=[0,0,0,0];let count=0;heats.forEach(h=>h.lanes.forEach((x,l)=>{if(x===id){count++;seen[l]++}}));return count===4&&seen.every(n=>n===1)});return ok}
+function renderGenerate(){const ready=eligibleTrad(),all=divRegs('trad'),notReady=all.filter(r=>!ready.includes(r));$('generateBody').innerHTML=`<div class="summary3"><div class="stat"><b>${ready.length}</b><span>Ready</span></div><div class="stat"><b>${notReady.length}</b><span>Not Ready</span></div><div class="stat"><b>${S.heats.length}</b><span>Heats</span></div></div><div class="actions"><button class="btn primary" id="genRace" ${ready.length>=2?'':'disabled'}>${S.heats.length?'REGENERATE RACE':'GENERATE RACE'}</button></div><div id="genStatus" style="margin-top:10px"></div><div id="scheduleList"></div>`;$('genRace').onclick=()=>{mutate(()=>{S.racers=ready.map((reg,i)=>{if(!reg.tradRacerId)reg.tradRacerId=Date.now()+i+1;return{id:reg.tradRacerId,registrationId:reg.id,name:reg.name,car:reg.tradCar||'',division:'Traditional',number:reg.tradNo||i+1}});S.heats=buildFairSchedule(S.racers.map(r=>r.id));S.current=0;S.displayMode='race';S.tieBreaks={};S.runoff=null});toast('Race generated.');renderGenerate()};if(S.heats.length){$('genStatus').innerHTML=verifySchedule(S.heats,S.racers.map(r=>r.id))?'<b class="green">✓ 4 rounds • every racer uses every lane once</b>':'<b class="red">Schedule check failed. Regenerate.</b>';$('scheduleList').innerHTML=S.heats.map(h=>`<div class="scheduleHeat"><div class="heatTitle">Round ${h.round} • Heat ${h.id}</div>${h.lanes.map((id,l)=>`<div class="laneLine"><b>Lane ${l+1}</b><span>${id?'#'+(racerById(id)?.number||''):'—'}</span><span>${id?esc(racerById(id)?.name||''):'Empty'}</span></div>`).join('')}</div>`).join('')}else if(ready.length<2)$('genStatus').innerHTML='<span class="gold">At least 2 racers must be checked in and approved.</span>'}
+function racerById(id){return S.racers.find(r=>r.id===id)||null}
+function heatPoints(position,count){if(count<=1)return 1;return Math.round((1+(position*3/(count-1)))*100)/100}
+
+function renderControl(){if(!S.heats.length){$('controlBody').innerHTML='<div class="panel"><h2>Race Control</h2><p class="gold">Generate the race first.</p></div>';return}S.current=Math.max(0,Math.min(S.current,S.heats.length-1));const h=S.heats[S.current],active=h.lanes.filter(Boolean),saved=Array.isArray(h.results)&&h.results.length>0;if(saved)finishPicks=h.results.slice().sort((a,b)=>a.position-b.position).map(x=>x.racerId);else finishPicks=finishPicks.filter(id=>active.includes(id));$('controlBody').innerHTML=`<div class="panel"><div class="controlTitle">Round ${h.round} • Heat ${h.id}</div><div class="controlGrid"><div id="finishList"></div><div class="panel"><h3>${saved?'Saved Results':'Finish Order'}</h3><div id="pickList"></div><div class="actions"><button class="btn" id="undoPick">Undo Pick</button><button class="btn good" id="saveHeat" ${finishPicks.length===active.length&&active.length?'':'disabled'}>SAVE RESULTS</button></div></div></div><div class="actions"><button class="btn" id="prevHeat" ${S.current===0?'disabled':''}>← Previous</button><button class="btn" id="nextHeat" ${S.current>=S.heats.length-1?'disabled':''}>Next →</button><button class="btn" id="openProj">Projector</button></div></div>`;const list=$('finishList');h.lanes.forEach((id,l)=>{if(!id)return;const r=racerById(id),pos=finishPicks.indexOf(id),b=document.createElement('button');b.className='finishBtn'+(pos>=0?' picked':'');b.innerHTML=`<span class="finishPos">${pos>=0?ordinal(pos+1):''}</span> Lane ${l+1} — #${r?.number||''} ${esc(r?.name||'')}`;b.onclick=()=>{if(saved)return;const i=finishPicks.indexOf(id);if(i>=0)finishPicks.splice(i,1);else if(finishPicks.length<active.length)finishPicks.push(id);renderControl()};list.appendChild(b)});$('pickList').innerHTML=finishPicks.length?finishPicks.map((id,i)=>`<div class="rowCard"><b>${ordinal(i+1)}</b> — ${esc(racerById(id)?.name||'')}</div>`).join(''):'<p class="muted">Tap racers in finish order.</p>';$('undoPick').onclick=()=>{if(!saved){finishPicks.pop();renderControl()}};$('saveHeat').onclick=()=>{mutate(()=>{const count=active.length;h.results=finishPicks.map((id,i)=>({racerId:id,position:i+1,points:heatPoints(i,count)}));S.current=Math.min(S.current+1,S.heats.length-1)});finishPicks=[];toast('Heat saved.');renderControl()};$('prevHeat').onclick=()=>{S.current--;finishPicks=[];persist();renderControl()};$('nextHeat').onclick=()=>{S.current++;finishPicks=[];persist();renderControl()};$('openProj').onclick=openProjector}
+function ordinal(n){return n===1?'1st':n===2?'2nd':n===3?'3rd':n+'th'}
+
+function standings(){const map=new Map(S.racers.map(r=>[r.id,{id:r.id,name:r.name,number:r.number,points:0,races:0,wins:0}]));S.heats.forEach(h=>(h.results||[]).forEach(x=>{const s=map.get(x.racerId);if(s){s.points+=Number(x.points)||0;s.races++;if(x.position===1)s.wins++}}));return Array.from(map.values()).sort((a,b)=>a.points-b.points||a.number-b.number)}
+function renderResults(){const a=standings(),finished=S.heats.filter(h=>h.results?.length).length,ties=[];for(let i=0;i<Math.min(4,a.length)-1;i++)if(a[i].races&&a[i+1].races&&Math.abs(a[i].points-a[i+1].points)<1e-9)ties.push(i+1);$('resultsBody').innerHTML=`<div class="pills"><span class="pill">${finished} / ${S.heats.length} Heats Saved</span>${ties.length?`<span class="pill gold">Runoff needed for tied trophy place${ties.length>1?'s':''}</span>`:''}</div>${a.length?`<table><thead><tr><th>Place</th><th>Racer</th><th>Points</th><th>Races</th><th>Wins</th></tr></thead><tbody>${a.map((r,i)=>`<tr><td>${i+1}</td><td>#${r.number} ${esc(r.name)}</td><td>${r.races?r.points.toFixed(2):'—'}</td><td>${r.races}</td><td>${r.wins}</td></tr>`).join('')}</tbody></table>`:'<p class="muted">No race results yet.</p>'}`}
+function openProjector(){window.open(location.pathname+'?projector=1&v=29','mnltProjector','width=1500,height=900')}
+$('liveProjector').onclick=openProjector;$('preRace').onclick=()=>window.open('v17-prerace.html?v=29','mnltPreRace','width=1500,height=900');
+function renderProjector(){if(!document.body.classList.contains('projectorOnly'))return;ensureState();const h=S.heats[S.current];if(!h){$('projectorView').innerHTML='<div class="projTitle">MNLT Pinewood Derby</div><div class="projPanel"><div class="projHeader">Waiting for Race</div></div>';return}const saved=h.results?.length;$('projectorView').innerHTML=`<div class="projTitle">Round ${h.round} • Heat ${h.id}</div><div class="projPanel"><div class="projHeader">${saved?'RESULTS':'RACING NOW'}</div>${saved?h.results.slice().sort((a,b)=>a.position-b.position).map(x=>{const r=racerById(x.racerId);return `<div class="projLane"><b>${ordinal(x.position)}</b><span>#${r?.number||''}</span><span>${esc(r?.name||'')}</span></div>`}).join(''):h.lanes.map((id,l)=>{const r=id?racerById(id):null;return `<div class="projLane"><b>Lane ${l+1}</b><span>${r?'#'+r.number:'—'}</span><span>${r?esc(r.name):'Empty'}</span></div>`}).join('')}</div>`}
+window.addEventListener('storage',e=>{if(e.key===KEY){try{S=JSON.parse(e.newValue||'null');ensureState();renderVisible();renderProjector()}catch(err){}}});if(bc)bc.onmessage=()=>{try{S=JSON.parse(localStorage.getItem(KEY)||'null');ensureState();renderVisible();renderProjector()}catch(e){}};
+
+$('saveDerby').onclick=()=>{const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='MNLT_Derby_Backup_'+new Date().toISOString().slice(0,10)+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)}
+$('loadDerby').onclick=()=>$('loadDerbyFile').click();$('loadDerbyFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const obj=JSON.parse(await f.text());pushHistory();S=obj;ensureState();persist();toast('Derby loaded.')}catch(err){toast('That backup file could not be loaded.')}}
+$('undoMajor').onclick=()=>{let h=[];try{h=JSON.parse(localStorage.getItem(HIST)||'[]')}catch(e){};const last=h.pop();if(!last){toast('Nothing to undo.');return}localStorage.setItem(HIST,JSON.stringify(h));S=last;ensureState();persist();toast('Last change undone.')}
+let resetArmed=false;$('resetDerby').onclick=e=>{if(!resetArmed){resetArmed=true;e.target.textContent='CLICK AGAIN TO RESET';setTimeout(()=>{resetArmed=false;e.target.textContent='Reset Derby'},3500);return}resetArmed=false;pushHistory();S=fresh();persist();resetRegForm();toast('Derby reset.');e.target.textContent='Reset Derby'}
+
+function renderVisible(){renderRegistration();renderHubs();if($('racersPage').classList.contains('active'))renderRacers();if($('checkinPage').classList.contains('active'))renderCheckin();if($('inspectPage').classList.contains('active'))renderInspection();if($('cardsPage').classList.contains('active'))renderCards();if($('generatePage').classList.contains('active'))renderGenerate();if($('controlPage').classList.contains('active'))renderControl();if($('resultsPage').classList.contains('active'))renderResults();renderProjector()}
+if(new URLSearchParams(location.search).get('projector')==='1')document.body.classList.add('projectorOnly');
+resetRegForm();renderVisible();
+</script>
+</body>
+</html>
