@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Manager v27</title>
+<style>
+html,body{margin:0;width:100%;height:100%;background:#0b1522;overflow:hidden}
+iframe{border:0;width:100%;height:100%;display:block;background:#0b1522}
+#mnltVersion{position:fixed;left:8px;bottom:5px;z-index:2147483647;color:#778a9d;font:12px Arial,sans-serif;pointer-events:none;background:#0b1522;padding:2px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<iframe id="shell" title="MNLT Derby Manager v27" src="v26.html?v=27-2258"></iframe>
+<div id="mnltVersion">v27</div>
+<script>
+(function(){
+'use strict';
+const shell=document.getElementById('shell');
+function findV25(){try{let w=shell.contentWindow;for(let i=0;i<32;i++){if((w.location.pathname||'').endsWith('/v25.html'))return w;const f=w.document.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}return null}catch(e){return null}}
+function patchHourly(){const w=findV25();if(!w||w.__mnltV27Hourly)return;try{w.eval(`if(typeof autoTimer!=='undefined'&&autoTimer){clearInterval(autoTimer)};autoTimer=setInterval(()=>checkMail(false),3600000);`);w.__mnltV27Hourly=true}catch(e){}}
+function patchLabel(){const w=findV25();if(!w)return;try{const d=w.document;const p=d.getElementById('v25GmailPanel');if(p){const t=p.querySelector('.v25Tiny');if(t&&!/Last checked/.test(t.textContent))t.textContent='Checks SnapPages derby signups hourly while the manager is open.'}}catch(e){}}
+function hideVersions(){try{let w=shell.contentWindow;for(let i=0;i<32;i++){const d=w.document;d.querySelectorAll('.version,#mnltVersion').forEach(v=>v.style.setProperty('display','none','important'));d.title='MNLT Derby Manager v27';const f=d.querySelector('iframe');if(!f||!f.contentWindow)break;w=f.contentWindow}}catch(e){}}
+function apply(){patchHourly();patchLabel();hideVersions()}
+shell.addEventListener('load',()=>{setTimeout(apply,150);setTimeout(apply,800);setTimeout(apply,1600)});
+setInterval(apply,700);
+})();
+</script>
+</body>
+</html>
