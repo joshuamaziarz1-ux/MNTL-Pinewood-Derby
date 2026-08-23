@@ -1,0 +1,6 @@
+MNLT Derby Manager stable base: v29.html
+
+Do not wrap this file in another iframe for future versions.
+Future versions should be copied from v29.html and edited directly.
+State compatibility: mnltDerbyV2
+Photo storage: IndexedDB mnltDerbyMedia / photos
