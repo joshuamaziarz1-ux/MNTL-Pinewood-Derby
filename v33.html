@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MNLT Derby Manager v33</title><style>html,body{margin:0;height:100%;background:#0b1522;color:#fff;font-family:Arial,sans-serif}.loading{height:100%;display:grid;place-items:center;font-size:24px;font-weight:900}</style></head>
+<body><div class="loading">Loading MNLT Derby Manager…</div>
+<script>
+fetch('v29.html?v=29-base',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('base');return r.text()}).then(src=>{
+ src=src.replace('<title>MNLT Derby Manager v29</title>','<title>MNLT Derby Manager v33</title>');
+ src=src.replace('<div class="toast" id="toast"></div><div class="version">v29 BASE</div>','<div class="toast" id="toast"></div><div class="version">v33</div>');
+ src=src.replace('<div class="cardHero"><div class="cardNo">${numLabel(cur,type)}</div><div id="cardPhoto" class="cardNoPhoto">CAR PHOTO</div></div>','<div class="cardHero"><div id="cardPhoto" class="cardNoPhoto">CAR PHOTO</div></div>');
+ src=src.replace("function openProjector(){window.open(location.pathname+'?projector=1&v=29','mnltProjector','width=1500,height=900')}","function openProjector(){window.open('v30-projector.html?v=33','mnltProjector','width=1500,height=900')}");
+ src=src.replace("$('liveProjector').onclick=openProjector;$('preRace').onclick=()=>window.open('v17-prerace.html?v=29','mnltPreRace','width=1500,height=900');","$('liveProjector').onclick=openProjector;$('preRace').onclick=()=>window.open('v30-prerace.html?v=33','mnltPreRace','width=1500,height=900');");
+ src=src.replace('</body>','<script>(function(){try{const k="mnltDerbyRegistrationBridgeV1",c=JSON.parse(localStorage.getItem(k)||"null");if(c&&c.url){const u=new URL(c.url);u.searchParams.set("authuser","1");c.url=u.toString();localStorage.setItem(k,JSON.stringify(c));}}catch(e){}})();<\/script><script src="v31-email-bridge.js?v=33"><\/script></body>');
+ document.open();document.write(src);document.close();
+}).catch(()=>{document.body.innerHTML='<div class="loading">Could not load the Derby Manager. Refresh the page.</div>'});
+</script></body></html>
