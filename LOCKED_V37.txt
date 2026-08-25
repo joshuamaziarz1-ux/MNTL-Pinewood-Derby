@@ -1,0 +1,19 @@
+MNLT Derby Manager v37 — LOCKED STABLE VERSION
+Locked 2026-08-25
+
+Do not edit these files in place:
+- v37.html — blob 3e69cc77d7522c7bf4d4760058e37bbdc8b96157
+- v37-review-draft.js — blob c73b57457471b2cfb42a98493af52520ac66b9bf
+- v36-credentialless.js — blob e95ae3be33c28571a019ea4bac61490b6e8fc2b7
+- v31-email-bridge.js — blob fe125fa11cfc7dfa57eb882a60b2176940ec4251
+
+Core data/storage compatibility:
+- localStorage: mnltDerbyV2
+- history: mnltDerbyV2History
+- IndexedDB: mnltDerbyMedia / photos
+- bridge config: mnltDerbyRegistrationBridgeV1
+
+Rollback URL:
+https://joshuamaziarz1-ux.github.io/MNTL-Pinewood-Derby/v37.html?v=37-locked
+
+All future manager changes go to v38 or higher.
