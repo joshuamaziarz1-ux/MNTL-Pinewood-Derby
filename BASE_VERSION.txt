@@ -1,6 +1,22 @@
-MNLT Derby Manager stable base: v29.html
+MNLT Derby Manager current locked stable base: v37.html
 
-Do not wrap this file in another iframe for future versions.
-Future versions should be copied from v29.html and edited directly.
+LOCKED: Do not modify v37.html or its locked dependencies in place.
+Future versions must use new versioned filenames and preserve v37 for rollback.
+
+v37 dependencies that are also locked:
+- v37-review-draft.js
+- v36-credentialless.js
+- v31-email-bridge.js
+- v29.html (core manager base)
+
 State compatibility: mnltDerbyV2
 Photo storage: IndexedDB mnltDerbyMedia / photos
+Email bridge config: mnltDerbyRegistrationBridgeV1
+
+v37 status when locked:
+- Registration email bridge connects successfully.
+- Email Registration panel is at the top of Registration.
+- REVIEW workflow fills the registration form before saving.
+- Gmail draft UI/workflow is present; Apps Script v37 server update is still required before draft creation works.
+
+Do not overwrite v37 while completing the Apps Script draft feature. Build v38+ for any manager-side changes.
