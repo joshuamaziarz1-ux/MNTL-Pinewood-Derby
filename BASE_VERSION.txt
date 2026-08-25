@@ -1,21 +1,26 @@
-MNLT Derby Manager current locked race-day stable: v39.html
+MNLT Derby Manager current locked stable: v40.html
 
-LOCKED: Do not modify v39.html, v39-runoff.js, v39-projector.html, v38-race-engine.js, or the earlier locked dependencies in place.
-Exact saved rollback branch: locked-v39-race-day
+LOCKED: Do not modify v40.html, v40-modified-v2.js, v40-projector.html, v39-runoff.js, v38-race-engine.js, or earlier locked dependencies in place.
+Exact saved rollback branch: locked-v40-modified
 
-v39 status when locked:
-- Traditional race manually tested by user and reported working great.
-- Verified 4-lane schedule engine.
+v40 status when locked:
+- Traditional race remains the verified v39 race-day engine.
+- Modified division added with Official / Exhibition classification.
+- Official Modified race uses the verified 4-lane schedule engine.
 - Four actual races per racer; every lane once.
 - No empty lanes with 4 or more racers.
+- Exhibition cars cannot enter Official scoring.
 - Trophy ties use progressive on-track runoff; no hidden tiebreaker.
 - Race Control locks if schedule verification fails.
-- Full v39 stress-test report is in V39_STRESS_TEST.md.
+- Full Modified stress-test report is in V40_STRESS_TEST.md.
+
+Previous rollback milestone:
+- locked-v39-race-day preserves the manually tested Traditional-only race-day build.
 
 v37 remains preserved as the earlier Registration/Email stable milestone.
 v29.html remains the immutable core manager base.
 
-Current development: v40+ adds the Modified division. Do not back-port Modified work into v39.
+Current development: v41+ projector/crowd-display redesign. Do not back-port projector work into v40.
 
 State compatibility: mnltDerbyV2
 Photo storage: IndexedDB mnltDerbyMedia / photos
