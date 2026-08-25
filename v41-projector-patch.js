@@ -1,7 +1,7 @@
 (function(){
 'use strict';
 const nativeOpen=window.open.bind(window);
-function projectorUrlV41(){return 'v41-projector-v2.html?v=41-audience-v2'}
+function projectorUrlV41(){return 'v41-projector-live.html?v=41-audience-live'}
 window.open=function(url,name,features){
  if(typeof url==='string'&&(url.includes('v40-projector.html')||url.includes('v41-projector.html')))url=projectorUrlV41();
  return nativeOpen(url,name,features);
