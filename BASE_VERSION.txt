@@ -1,22 +1,22 @@
-MNLT Derby Manager current locked stable base: v37.html
+MNLT Derby Manager current locked race-day stable: v39.html
 
-LOCKED: Do not modify v37.html or its locked dependencies in place.
-Future versions must use new versioned filenames and preserve v37 for rollback.
+LOCKED: Do not modify v39.html, v39-runoff.js, v39-projector.html, v38-race-engine.js, or the earlier locked dependencies in place.
+Exact saved rollback branch: locked-v39-race-day
 
-v37 dependencies that are also locked:
-- v37-review-draft.js
-- v36-credentialless.js
-- v31-email-bridge.js
-- v29.html (core manager base)
+v39 status when locked:
+- Traditional race manually tested by user and reported working great.
+- Verified 4-lane schedule engine.
+- Four actual races per racer; every lane once.
+- No empty lanes with 4 or more racers.
+- Trophy ties use progressive on-track runoff; no hidden tiebreaker.
+- Race Control locks if schedule verification fails.
+- Full v39 stress-test report is in V39_STRESS_TEST.md.
+
+v37 remains preserved as the earlier Registration/Email stable milestone.
+v29.html remains the immutable core manager base.
+
+Current development: v40+ adds the Modified division. Do not back-port Modified work into v39.
 
 State compatibility: mnltDerbyV2
 Photo storage: IndexedDB mnltDerbyMedia / photos
 Email bridge config: mnltDerbyRegistrationBridgeV1
-
-v37 status when locked:
-- Registration email bridge connects successfully.
-- Email Registration panel is at the top of Registration.
-- REVIEW workflow fills the registration form before saving.
-- Gmail draft UI/workflow is present; Apps Script v37 server update is still required before draft creation works.
-
-Do not overwrite v37 while completing the Apps Script draft feature. Build v38+ for any manager-side changes.
