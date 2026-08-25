@@ -1,0 +1,9 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>MNLT Pinewood Derby • Audience Projector v41</title><style>html,body{margin:0;height:100%;background:#07111d;color:#fff;font-family:Arial,sans-serif}.loading{height:100%;display:grid;place-items:center;font-size:28px;font-weight:900}</style></head><body><div class="loading">Loading MNLT Audience Projector…</div><script>
+fetch('v41-projector-v2.html?v=41-audience-v2',{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('projector');return r.text()}).then(src=>{
+ const oldCode="async function update(){const old=S?clone(S):null,n=state(),e=newlySaved(old,n);S=n;return e?sequence(e):normal()}";
+ const newCode="async function update(){const n=state();if(S&&Number(n.updatedAt||0)===Number(S.updatedAt||0))return;const old=S?clone(S):null,e=newlySaved(old,n);S=n;return e?sequence(e):normal()}";
+ if(!src.includes(oldCode))throw Error('projector patch');
+ src=src.replace(oldCode,newCode);
+ document.open();document.write(src);document.close();
+}).catch(()=>{document.body.innerHTML='<div class="loading">Could not load the audience projector. Refresh the page.</div>'});
+</script></body></html>
