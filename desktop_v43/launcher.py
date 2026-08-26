@@ -1,6 +1,7 @@
 """Packaged entry point for MNLT Derby Manager v43 Desktop.
 
-Adds desktop-only migration helpers without changing the core app module.
+Adds desktop-only migration helpers and validated race-day fixes without
+changing the locked browser implementations.
 """
 
 from __future__ import annotations
@@ -11,7 +12,10 @@ import app as desktop_app
 from backup import create_full_backup
 from migration import import_v42_backup
 from storage import ensure_state
+import desktop_fixes
 
+
+desktop_fixes.install()
 
 _original_backup_init = desktop_app.BackupPage.__init__
 
