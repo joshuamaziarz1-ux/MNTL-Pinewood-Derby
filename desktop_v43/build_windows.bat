@@ -20,13 +20,13 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
-python -m py_compile app.py storage.py backup.py race_engine.py
+python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py
 if errorlevel 1 exit /b 1
 
 pytest -q
 if errorlevel 1 exit /b 1
 
-pyinstaller --noconfirm --clean --onefile --windowed --name MNLT_Derby_Manager_v43 app.py
+pyinstaller --noconfirm --clean --onefile --windowed --name MNLT_Derby_Manager_v43 launcher.py
 if errorlevel 1 exit /b 1
 
 echo.
