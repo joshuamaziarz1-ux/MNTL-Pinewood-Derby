@@ -29,3 +29,8 @@ def test_filter_new_signups_deduplicates_by_message_and_racer_name():
     ]
     out = filter_new_signups(state, rows, ["ignored-1"])
     assert [x["messageId"] for x in out] == ["new-2"]
+
+
+def test_requests_client_is_available():
+    import gmail_bridge
+    assert hasattr(gmail_bridge, "requests")
