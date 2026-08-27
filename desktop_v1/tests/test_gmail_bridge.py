@@ -34,3 +34,14 @@ def test_filter_new_signups_deduplicates_by_message_and_racer_name():
 def test_requests_client_is_available():
     import gmail_bridge
     assert hasattr(gmail_bridge, "requests")
+
+
+def test_parse_bridge_payload_accepts_wrapper_variants():
+    import json
+    from gmail_bridge import parse_bridge_payload
+
+    obj = {"ok": True, "registrations": [{"messageId": "m1", "name": "Racer"}]}
+    raw = json.dumps(obj)
+    assert parse_bridge_payload("/**/__mnltBridge_desktop(" + raw + ");") == obj
+    assert parse_bridge_payload("__mnltBridge_desktop && __mnltBridge_desktop(" + raw + ");") == obj
+    assert parse_bridge_payload(")]}'\n" + raw) == obj
