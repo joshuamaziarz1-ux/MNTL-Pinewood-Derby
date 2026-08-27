@@ -13,6 +13,8 @@ import re
 import time
 import urllib.parse
 import urllib.request
+
+import requests
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
