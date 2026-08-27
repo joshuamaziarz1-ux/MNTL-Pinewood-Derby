@@ -94,6 +94,7 @@ class CredentiallessAppsScriptRequest(QObject):
         self.callback = f"__mnltBridge_{int(time.time() * 1000)}_{random.randint(100000, 999999)}"
         self.manager = QNetworkAccessManager(self)
         self.reply: QNetworkReply | None = None
+        self.redirects_left = 10
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self._timeout)
@@ -111,34 +112,58 @@ class CredentiallessAppsScriptRequest(QObject):
         sep = "&" if "?" in self.url else "?"
         request_url = self.url + sep + urllib.parse.urlencode(query)
 
-        request = QNetworkRequest(QUrl(request_url))
+        self.timer.start(self.timeout_ms)
+        self._get(QUrl(request_url))
+
+    def _get(self, url: QUrl) -> None:
+        request = QNetworkRequest(url)
         request.setRawHeader(b"User-Agent", b"Mozilla/5.0 MNLT-Derby-Manager-Desktop-v1")
         request.setRawHeader(b"Accept", b"application/json,text/javascript,text/plain,*/*")
         request.setRawHeader(b"Cache-Control", b"no-cache")
         request.setRawHeader(b"Pragma", b"no-cache")
+        # Follow redirects ourselves. This is more predictable across Qt
+        # versions and matches Apps Script's /exec -> googleusercontent hop.
         request.setAttribute(
             QNetworkRequest.RedirectPolicyAttribute,
-            QNetworkRequest.NoLessSafeRedirectPolicy,
+            QNetworkRequest.ManualRedirectPolicy,
         )
-
         self.reply = self.manager.get(request)
         self.reply.finished.connect(self._reply_finished)
-        self.timer.start(self.timeout_ms)
 
     def _reply_finished(self) -> None:
         if self.done or self.reply is None:
             return
 
         reply = self.reply
+
+        redirect = reply.attribute(QNetworkRequest.RedirectionTargetAttribute)
+        if redirect and self.redirects_left > 0:
+            try:
+                next_url = reply.url().resolved(QUrl(redirect))
+            except Exception:
+                next_url = QUrl(str(redirect))
+            self.redirects_left -= 1
+            reply.deleteLater()
+            self.reply = None
+            self._get(next_url)
+            return
+
+        if redirect and self.redirects_left <= 0:
+            reply.deleteLater()
+            self.reply = None
+            self._finish(None, "Apps Script exceeded the redirect limit.")
+            return
+
         status = reply.attribute(QNetworkRequest.HttpStatusCodeAttribute)
         final_url = reply.url().toString()
         error_code = reply.error()
+        error_text = reply.errorString()
         raw = bytes(reply.readAll()).decode("utf-8", errors="replace")
         reply.deleteLater()
         self.reply = None
 
         if error_code != QNetworkReply.NoError and not raw:
-            self._finish(None, f"Network error: {reply.errorString()}")
+            self._finish(None, f"Network error: {error_text}")
             return
 
         low = raw.casefold()
