@@ -1,4 +1,4 @@
-"""MNLT Derby Manager v43 Desktop.
+"""MNLT Derby Manager Desktop v1.
 
 Pure Python/PySide6 desktop shell. No browser, GitHub Pages, or network is
 required for race-day operation.
@@ -45,7 +45,7 @@ from backup import create_full_backup, restore_full_backup, verify_backup
 from race_engine import build_fair_schedule, heat_points, score_blocks, standings, trophy_tie_groups, verify_schedule
 from storage import DerbyStore, ensure_state
 
-APP_VERSION = "v43 Desktop Alpha"
+APP_VERSION = "Desktop v1"
 
 TRAD_ITEMS = [
     "Length 7.0 in maximum",
