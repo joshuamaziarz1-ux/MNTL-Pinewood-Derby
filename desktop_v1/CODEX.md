@@ -23,6 +23,17 @@ All current desktop feature work belongs under `desktop_v1/`.
 
 Do not redesign the UI while the functional restoration work is still underway.
 
+## Permanent updater contract
+- The user-facing permanent launcher is `MNLT_Derby_Manager.exe`.
+- The actual race manager is published as `MNLT_Derby_Manager_App.exe`.
+- Automatic updates use the public `desktop-v1-latest` GitHub release.
+- Every update must be accompanied by `desktop-v1-manifest.json` containing build ID and SHA-256.
+- The launcher must verify SHA-256 before swapping the installed app.
+- If update check/download fails and a prior app exists, open the prior app.
+- Updates must never overwrite, remove, migrate, or bundle the live `derby.db`, `Photos`, or `Backups`.
+- Do not add Derby data or Gmail secrets to update manifests or GitHub releases.
+- Changes to the updater itself require extra caution because it is intended to be installed once and reused.
+
 ## Non-negotiable race safety
 1. Preserve the proven v38/v39/v40 race behavior unless a change is explicitly approved.
 2. Trophy ties are settled on the track. Never use racer number, wins, random choice,
@@ -41,9 +52,12 @@ Do not redesign the UI while the functional restoration work is still underway.
 5. Gmail bridge credentials are local machine configuration and must not be committed to GitHub.
 
 ## Required checks before Desktop v1 is called stable
-- `python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py gmail_bridge.py desktop_fixes.py`
+- `python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py gmail_bridge.py desktop_fixes.py updater.py`
 - `pytest -q`
-- Windows PyInstaller build completes
+- Windows PyInstaller build completes for both updater and race manager
+- update release contains app + manifest
+- updater downloads a new build and verifies its SHA-256
+- updater opens prior build when update check fails
 - executable launches on Windows
 - existing SQLite registrations survive close/reopen
 - portable backup restores correctly
