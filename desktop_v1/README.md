@@ -13,6 +13,26 @@ This is the clean version-number restart for the Windows desktop edition.
 - real car photo files stored outside the executable
 - separate audience projector window for HDMI / extended desktop
 
+## Permanent updater
+The Desktop v1 user-facing icon is now a small permanent launcher named:
+
+`MNLT_Derby_Manager.exe`
+
+It does not contain or edit Derby race data. On launch it:
+1. checks the public `desktop-v1-latest` GitHub release manifest,
+2. downloads a newer `MNLT_Derby_Manager_App.exe` only when the build changes,
+3. verifies the app's SHA-256 hash before replacing the installed program,
+4. keeps the previous app build during the swap,
+5. launches the newest verified app,
+6. opens the last installed app normally when the internet is unavailable.
+
+The downloaded app lives under the existing local data root in the `Program` subfolder.
+The Derby database, Photos, and Backups remain separate and are never replaced by an app update.
+
+After the permanent updater is installed once, normal Desktop v1 changes are published to the
+stable `desktop-v1-latest` update channel by GitHub Actions. The user should not need to
+manually download and replace the Derby Manager for ordinary updates.
+
 ## Desktop v1 restoration priorities
 1. Gmail / SnapPages registration bridge
    - Check Now + hourly checks
