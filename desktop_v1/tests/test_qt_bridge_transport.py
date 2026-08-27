@@ -22,6 +22,18 @@ def test_parse_direct_jsonp_document():
 class _Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlsplit(self.path)
+
+        # Mimic Apps Script's normal redirect hop before the final content
+        # response. Preserve the original query exactly.
+        if parsed.path == "/exec":
+            target = "/payload"
+            if parsed.query:
+                target += "?" + parsed.query
+            self.send_response(302)
+            self.send_header("Location", target)
+            self.end_headers()
+            return
+
         query = urllib.parse.parse_qs(parsed.query)
         callback = query.get("callback", ["cb"])[0]
         key = query.get("key", [""])[0]
