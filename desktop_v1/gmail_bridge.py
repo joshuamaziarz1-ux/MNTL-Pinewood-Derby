@@ -95,12 +95,18 @@ def parse_bridge_payload(text: str, callback: str = "mnltDesktopCallback") -> di
 
 
 def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, timeout: int = 18) -> dict[str, Any]:
+    """Call the public Apps Script bridge without Google-account cookies.
+
+    The browser build only became reliable once the request was made
+    credentialless. A fresh requests.Session gives the desktop app the same
+    anonymous behavior while still following Apps Script redirects.
+    """
     url = normalize_url(url)
     if not url:
         raise ValueError("Apps Script Web App URL is invalid.")
     if not str(key or "").strip():
         raise ValueError("Bridge Key is required.")
-    callback = "mnltDesktopCallback"
+    callback = "__mnltBridge_desktop"
     query: dict[str, Any] = {
         "key": str(key).strip(),
         "callback": callback,
@@ -108,17 +114,39 @@ def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, tim
     }
     for k, v in (params or {}).items():
         query[str(k)] = "" if v is None else str(v)
-    sep = "&" if "?" in url else "?"
-    full_url = url + sep + urllib.parse.urlencode(query)
-    req = urllib.request.Request(
-        full_url,
-        headers={
-            "User-Agent": "MNLT-Derby-Manager-Desktop-v1",
-            "Accept": "application/json,text/javascript,*/*",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as response:
-        body = response.read().decode("utf-8", errors="replace")
+
+    session = requests.Session()
+    session.cookies.clear()
+    try:
+        response = session.get(
+            url,
+            params=query,
+            timeout=timeout,
+            allow_redirects=True,
+            headers={
+                "User-Agent": "Mozilla/5.0 MNLT-Derby-Manager-Desktop-v1",
+                "Accept": "application/json,text/javascript,text/plain,*/*",
+                "Cache-Control": "no-cache",
+                "Pragma": "no-cache",
+            },
+        )
+    except requests.RequestException as exc:
+        raise ConnectionError(f"Could not reach Apps Script ({exc.__class__.__name__}).") from exc
+
+    if response.status_code != 200:
+        raise ConnectionError(f"Apps Script returned HTTP {response.status_code}.")
+
+    body = response.text.lstrip("\ufeff").strip()
+    if not body:
+        raise ConnectionError("Apps Script returned an empty response.")
+    if body.startswith("<!DOCTYPE html") or body.startswith("<html"):
+        low = body.casefold()
+        if "sign in" in low or "accounts.google" in low:
+            raise ConnectionError(
+                "Google returned a sign-in page. The Apps Script deployment must allow Anyone access."
+            )
+        raise ConnectionError("Google returned an HTML page instead of bridge data.")
+
     return parse_bridge_payload(body, callback)
 
 
@@ -310,14 +338,15 @@ class EmailRegistrationPage(QWidget):
             data = future.result()
         except Exception as exc:
             if kind == "check":
-                self.status.setText("Connection problem — check the Web App URL and Bridge Key.")
+                self.status.setText(f"Connection problem — {exc}")
             else:
                 QMessageBox.warning(self, "Gmail Draft", f"Racer was saved, but the Gmail draft could not be created.\n\n{exc}")
             return
 
         if kind == "check":
             if data.get("ok") is not True:
-                self.status.setText("Connection problem — the bridge did not approve the request.")
+                detail = str(data.get("error") or "the bridge did not approve the request")
+                self.status.setText(f"Connection problem — {detail}.")
                 return
             cfg = load_config(self.manager.store)
             self.incoming = filter_new_signups(
