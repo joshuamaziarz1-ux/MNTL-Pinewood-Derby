@@ -52,7 +52,7 @@ def create_full_backup(store: DerbyStore, destination: Path | str | None = None)
             "format": BACKUP_FORMAT,
             "schema": BACKUP_SCHEMA,
             "created_at": datetime.now().isoformat(timespec="seconds"),
-            "app_version": "v43",
+            "app_version": "Desktop v1",
             "files": checksums,
         }
         manifest_path = stage / "manifest.json"
