@@ -65,12 +65,23 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          $repo = "joshuamaziarz1-ux/MNTL-Pinewood-Derby"
           $tag = "desktop-v1-latest"
-          gh release view $tag --repo joshuamaziarz1-ux/MNTL-Pinewood-Derby *> $null
+          gh release view $tag --repo $repo *> $null
           if ($LASTEXITCODE -ne 0) {
-            gh release create $tag --repo joshuamaziarz1-ux/MNTL-Pinewood-Derby --title "MNLT Derby Manager Desktop v1 - Latest" --notes "Automatic-update channel for Desktop v1."
+            gh release create $tag --repo $repo --title "MNLT Derby Manager Desktop v1 - Latest" --notes "Automatic-update channel for Desktop v1."
           }
-          gh release upload $tag dist/MNLT_Derby_Manager_App.exe desktop-v1-manifest.json --clobber --repo joshuamaziarz1-ux/MNTL-Pinewood-Derby
+
+          $release = gh api "repos/$repo/releases/tags/$tag" | ConvertFrom-Json
+          foreach ($name in @("MNLT_Derby_Manager_App.exe", "desktop-v1-manifest.json")) {
+            $asset = $release.assets | Where-Object { $_.name -eq $name } | Select-Object -First 1
+            if ($asset) {
+              gh api -X DELETE "repos/$repo/releases/assets/$($asset.id)"
+            }
+          }
+
+          gh release upload $tag dist/MNLT_Derby_Manager_App.exe --repo $repo
+          gh release upload $tag desktop-v1-manifest.json --repo $repo
 
       - name: Upload permanent updater
         uses: actions/upload-artifact@v4
