@@ -55,19 +55,11 @@ class CredentiallessAppsScriptRequest(QObject):
         sep = "&" if "?" in self.url else "?"
         src = self.url + sep + urllib.parse.urlencode(query)
 
-        # Exact strategy from the known-working browser v36 implementation:
-        # sandboxed + credentialless iframe, then JSONP script inside it.
-        inner = (
-            "<!doctype html><meta charset=\"utf-8\"><script>(function(){"
-            "const cb=" + json.dumps(self.callback) + ",tag=" + json.dumps(self.tag) + ";"
-            "window[cb]=function(d){parent.postMessage({tag:tag,payload:d},\"*\")};"
-            "const s=document.createElement(\"script\");"
-            "s.src=" + json.dumps(src) + ";"
-            "s.onerror=function(){parent.postMessage({tag:tag,error:\"script load failed\"},\"*\")};"
-            "document.head.appendChild(s)"
-            "})();<\\/script>"
-        )
-
+        # Qt WebEngine uses its own fresh cookie jar/profile, separate from the
+        # user's Chrome/Google sessions. That means we do not need the browser
+        # v36 credentialless iframe trick here. Execute the JSONP endpoint
+        # directly as a <script> so Apps Script can call the callback exactly
+        # as it does in a normal browser, with no CORS or Python parsing layer.
         html = f"""<!doctype html>
 <meta charset="utf-8">
 <title>MNLT Bridge</title>
@@ -75,22 +67,20 @@ class CredentiallessAppsScriptRequest(QObject):
 <script>
 window.__mnltResult = null;
 (function(){{
-  const tag={json.dumps(self.tag)};
-  const frame=document.createElement('iframe');
-  frame.style.display='none';
-  frame.setAttribute('sandbox','allow-scripts');
-  frame.setAttribute('credentialless','');
-  try{{frame.credentialless=true}}catch(e){{}}
-  window.addEventListener('message',function(ev){{
-    if(ev.source!==frame.contentWindow||!ev.data||ev.data.tag!==tag)return;
-    if(ev.data.error)window.__mnltResult={{error:String(ev.data.error)}};
-    else window.__mnltResult={{payload:ev.data.payload}};
-  }});
-  frame.srcdoc={json.dumps(inner)};
-  document.body.appendChild(frame);
+  const cb={json.dumps(self.callback)};
+  window[cb]=function(data){{
+    window.__mnltResult={{payload:data}};
+  }};
+  const s=document.createElement('script');
+  s.src={json.dumps(src)};
+  s.async=true;
+  s.onerror=function(){{
+    window.__mnltResult={{error:'Apps Script JSONP script failed to load'}};
+  }};
+  document.head.appendChild(s);
 }})();
 </script>"""
-        self.page.setHtml(html, QUrl("https://mnlt-desktop.local/"))
+        self.page.setHtml(html, QUrl("about:blank"))
         self.timer.start(self.timeout_ms)
         self.poll.start()
 
