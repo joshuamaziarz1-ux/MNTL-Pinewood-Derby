@@ -19,6 +19,8 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+from qt_bridge import CredentiallessAppsScriptRequest
+
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -233,6 +235,7 @@ class EmailRegistrationPage(QWidget):
         self._future = None
         self._future_kind = ""
         self._draft_context = None
+        self._web_request = None
 
         layout = QVBoxLayout(self)
         title = QLabel("Email Registration")
@@ -346,7 +349,7 @@ class EmailRegistrationPage(QWidget):
         self.status.setText("Disconnected")
 
     def check_now(self, manual: bool = True) -> None:
-        if self._future is not None:
+        if self._web_request is not None:
             return
         url = normalize_url(self.url.text())
         key = self.key.text().strip()
@@ -356,9 +359,93 @@ class EmailRegistrationPage(QWidget):
             return
         self.status.setText("Checking for new registrations…")
         self.check_btn.setEnabled(False)
-        self._future_kind = "check"
-        self._future = self._executor.submit(bridge_request, url, key, {})
-        self.poll_timer.start()
+        self._start_web_request("check", {}, None)
+
+    def _start_web_request(self, kind: str, params: dict[str, Any], context: dict[str, Any] | None) -> None:
+        cfg = load_config(self.manager.store)
+        url = normalize_url(cfg.get("url", "") or self.url.text())
+        key = str(cfg.get("key", "") or self.key.text()).strip()
+        if not url or not key:
+            self.check_btn.setEnabled(True)
+            self.status.setText("Not set up")
+            return
+        request = CredentiallessAppsScriptRequest(url, key, params, self)
+        self._web_request = request
+        self._future_kind = kind
+        self._draft_context = copy.deepcopy(context) if context else None
+        request.finished.connect(self._web_finished)
+        request.start()
+
+    def _web_finished(self, data: object, error: object) -> None:
+        kind = self._future_kind
+        context = self._draft_context
+        request = self._web_request
+        self._web_request = None
+        self._future_kind = ""
+        self._draft_context = None
+        self.check_btn.setEnabled(True)
+
+        if error:
+            if kind == "check":
+                self.status.setText(f"Connection problem — {error}")
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Gmail Draft",
+                    f"Racer was saved, but the Gmail draft could not be created.\n\n{error}",
+                )
+            if request:
+                request.deleteLater()
+            return
+
+        if not isinstance(data, dict):
+            if kind == "check":
+                self.status.setText("Connection problem — Apps Script returned an invalid payload.")
+            else:
+                QMessageBox.warning(self, "Gmail Draft", "Racer was saved, but Apps Script returned an invalid payload.")
+            if request:
+                request.deleteLater()
+            return
+
+        if kind == "check":
+            if data.get("ok") is not True:
+                detail = str(data.get("error") or "the bridge did not approve the request")
+                self.status.setText(f"Connection problem — {detail}.")
+            else:
+                cfg = load_config(self.manager.store)
+                self.incoming = filter_new_signups(
+                    self.manager.state,
+                    data.get("registrations") if isinstance(data.get("registrations"), list) else [],
+                    cfg.get("ignored", []),
+                )
+                self.status.setText(
+                    f"Connected • {len(self.incoming)} new registration"
+                    + ("" if len(self.incoming) == 1 else "s")
+                    + " waiting"
+                )
+                self.refresh_table()
+        elif kind == "draft":
+            if data.get("ok") is True and data.get("draftCreated"):
+                missing = data.get("missingAttachments") if isinstance(data.get("missingAttachments"), list) else []
+                if missing:
+                    QMessageBox.information(
+                        self,
+                        "Gmail Draft Created",
+                        "Racer saved and Gmail confirmation draft created.\n\nOne or more rule PDF attachments need attention.",
+                    )
+                else:
+                    QMessageBox.information(self, "Gmail Draft Created", "Racer saved and Gmail confirmation draft created.")
+            else:
+                QMessageBox.warning(
+                    self,
+                    "Gmail Draft",
+                    "Racer was saved, but the Apps Script bridge did not create a draft. The bridge may still need the draft-capable server update.",
+                )
+            if context:
+                self.mark_imported(str(context.get("messageId", "")))
+
+        if request:
+            request.deleteLater()
 
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
@@ -490,7 +577,7 @@ class EmailRegistrationPage(QWidget):
         self.refresh_table()
 
     def create_draft_for(self, pending: dict[str, Any], saved: dict[str, Any]) -> None:
-        if self._future is not None:
+        if self._web_request is not None:
             QMessageBox.information(
                 self,
                 "Gmail Draft",
@@ -515,10 +602,7 @@ class EmailRegistrationPage(QWidget):
             "modCar": saved.get("modCar", ""),
         }
         self.status.setText("Creating Gmail confirmation draft…")
-        self._future_kind = "draft"
-        self._draft_context = copy.deepcopy(pending)
-        self._future = self._executor.submit(bridge_request, url, key, params)
-        self.poll_timer.start()
+        self._start_web_request("draft", params, pending)
 
 
 def install(desktop_app) -> None:
