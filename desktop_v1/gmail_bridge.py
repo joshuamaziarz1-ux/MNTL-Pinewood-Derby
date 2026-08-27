@@ -124,7 +124,14 @@ def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, tim
 
 def _division(value: str) -> str:
     value = str(value or "").strip()
-    return value if value in {"Traditional", "Modified", "Both"} else "Traditional"
+    if value in {"Traditional", "Modified", "Both"}:
+        return value
+    low = value.casefold()
+    if "both" in low:
+        return "Both"
+    if "modified" in low:
+        return "Modified"
+    return "Traditional"
 
 
 def filter_new_signups(state: dict[str, Any], rows: list[dict[str, Any]], ignored: list[str]) -> list[dict[str, Any]]:
