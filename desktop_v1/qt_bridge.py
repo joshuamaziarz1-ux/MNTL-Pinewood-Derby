@@ -14,7 +14,7 @@ import urllib.parse
 from typing import Any
 
 from PySide6.QtCore import QObject, QTimer, QUrl, Signal
-from PySide6.QtWebEngineCore import QWebEnginePage
+from PySide6.QtWebEngineCore import QWebEnginePage, QWebEngineSettings
 
 
 class CredentiallessAppsScriptRequest(QObject):
@@ -36,6 +36,12 @@ class CredentiallessAppsScriptRequest(QObject):
         self.callback = f"__mnltBridge_{int(time.time() * 1000)}_{random.randint(100000, 999999)}"
         self.tag = "mnltDesktop_" + self.callback
         self.page = QWebEnginePage(self)
+        settings = self.page.settings()
+        settings.setAttribute(QWebEngineSettings.JavascriptEnabled, True)
+        # setHtml() creates local content. Qt WebEngine blocks local pages from
+        # loading remote URLs by default, which was silently preventing the
+        # Apps Script JSONP <script> from ever loading and caused the timeout.
+        settings.setAttribute(QWebEngineSettings.LocalContentCanAccessRemoteUrls, True)
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.timeout.connect(self._timeout)
