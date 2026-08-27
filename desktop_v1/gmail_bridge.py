@@ -81,19 +81,54 @@ def save_config(store, data: dict[str, Any]) -> None:
 
 
 def parse_bridge_payload(text: str, callback: str = "mnltDesktopCallback") -> dict[str, Any]:
+    """Parse Apps Script JSON or JSONP defensively.
+
+    Apps Script can return the same payload with small wrapper differences
+    depending on redirects/content type. The browser executes those wrappers
+    as JavaScript; the desktop app has to unwrap them itself.
+    """
     text = str(text or "").lstrip("\ufeff").strip()
     if not text:
         raise ValueError("The registration bridge returned an empty response.")
-    if text.startswith("{") or text.startswith("["):
+
+    # Plain JSON.
+    try:
         data = json.loads(text)
-    else:
-        match = re.match(r"^[A-Za-z_$][\w$]*\s*\((.*)\)\s*;?\s*$", text, re.S)
-        if not match:
-            raise ValueError("The registration bridge returned an unreadable response.")
-        data = json.loads(match.group(1))
-    if not isinstance(data, dict):
-        raise ValueError("The registration bridge response was not an object.")
-    return data
+        if isinstance(data, dict):
+            return data
+    except Exception:
+        pass
+
+    # Common JSONP forms, including a leading JS comment and
+    # "callback && callback({...})".
+    cleaned = re.sub(r"^\s*/\*.*?\*/\s*", "", text, flags=re.S)
+    patterns = [
+        r"^[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
+        r"^[A-Za-z_$][\w$]*\s*&&\s*[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
+        r"^typeof\s+[A-Za-z_$][\w$]*\s*===?\s*['\"]function['\"]\s*&&\s*[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
+    ]
+    for pattern in patterns:
+        match = re.match(pattern, cleaned, re.S)
+        if match:
+            try:
+                data = json.loads(match.group(1))
+            except Exception:
+                continue
+            if isinstance(data, dict):
+                return data
+
+    # Last-resort extraction of the JSON object from a harmless JS wrapper or
+    # XSSI prefix. JSONDecoder.raw_decode avoids greedily swallowing suffix JS.
+    start = cleaned.find("{")
+    if start >= 0:
+        try:
+            data, _end = json.JSONDecoder().raw_decode(cleaned[start:])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+
+    raise ValueError("The registration bridge returned a response format Desktop v1 did not recognize.")
 
 
 def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, timeout: int = 18) -> dict[str, Any]:
