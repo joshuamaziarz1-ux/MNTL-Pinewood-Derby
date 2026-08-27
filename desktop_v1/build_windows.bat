@@ -20,16 +20,16 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
-python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py
+python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py gmail_bridge.py desktop_fixes.py
 if errorlevel 1 exit /b 1
 
 pytest -q
 if errorlevel 1 exit /b 1
 
-pyinstaller --noconfirm --clean --onefile --windowed --name MNLT_Derby_Manager_v43 launcher.py
+pyinstaller --noconfirm --clean --onefile --windowed --name MNLT_Derby_Manager_Desktop_v1 launcher.py
 if errorlevel 1 exit /b 1
 
 echo.
 echo BUILD COMPLETE
-echo EXE: %CD%\dist\MNLT_Derby_Manager_v43.exe
+echo EXE: %CD%\dist\MNLT_Derby_Manager_Desktop_v1.exe
 pause
