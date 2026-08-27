@@ -1,15 +1,37 @@
-# MNLT Derby Manager v43 Desktop
+# MNLT Derby Manager Desktop v1
 
-This folder is the Python desktop conversion of the MNLT Derby Manager.
+This is the clean version-number restart for the Windows desktop edition.
 
-Goals:
+## Proven foundation kept from the desktop alpha
 - no browser dependency for race-day operation
-- local SQLite database for race state
-- autosave on every change
-- real photo files stored outside the executable
-- timestamped automatic backups
-- portable full-backup ZIP files for transfer to another computer
-- second-window projector output for HDMI / extended desktop
-- preserve the proven v38/v39/v40 scheduling, scoring, runoff, and Modified-division rules
+- local SQLite database with immediate autosave
+- startup and close backups
+- portable full-backup ZIP files with SHA-256 integrity checks
+- v42 browser-backup import
+- Traditional and Modified race engines
+- verified scheduling, scoring, and on-track trophy runoffs
+- real car photo files stored outside the executable
+- separate audience projector window for HDMI / extended desktop
 
-The existing browser builds remain untouched. v42 is the browser recovery fallback.
+## Desktop v1 restoration priorities
+1. Gmail / SnapPages registration bridge
+   - Check Now + hourly checks
+   - review signup before saving
+   - preserve source Gmail message ID
+   - create confirmation Gmail draft when the Apps Script bridge supports it
+2. Projector parity
+   - Waiting
+   - Now Racing
+   - Heat Results
+   - Up Next
+   - Trophy Runoff
+   - Final Results
+   - Traditional + Modified
+3. Full workflow shakedown and backup/restore test
+
+## Layout rule
+Do not spend time polishing spacing, widths, stretched panels, or compact controls yet.
+Functional parity and reliability come first. Layout cleanup is the final phase after
+Registration, Gmail bridge, Traditional, Modified, backups, and projector all work together.
+
+The browser milestones remain locked as emergency fallbacks.
