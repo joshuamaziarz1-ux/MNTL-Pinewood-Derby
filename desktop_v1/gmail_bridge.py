@@ -1,24 +1,28 @@
-"""Gmail / SnapPages registration bridge for MNLT Derby Manager Desktop v1.
+"""Clean Gmail / SnapPages registration bridge for MNLT Derby Manager Desktop v1.
 
-The bridge talks to the existing Google Apps Script Web App. The URL and bridge
-key are stored in a small local config file beside the desktop data, not inside
-portable Derby backups.
+Desktop v1 intentionally uses one transport only:
+    requests GET -> Apps Script /exec -> plain JSON
+
+The working browser v42 uses JSONP because browsers need a script callback. Desktop
+Python does not. The Apps Script bridge already returns plain JSON whenever the
+callback query parameter is omitted, so Desktop v1 avoids JSONP completely.
+
+Bridge credentials are stored locally beside the Desktop data and are never written
+into Derby portable backups or GitHub.
 """
 
 from __future__ import annotations
 
 import copy
-import html
 import json
 import re
 import time
 import urllib.parse
-
-import requests
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
 
+import requests
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
@@ -38,27 +42,54 @@ from PySide6.QtWidgets import (
 
 CONFIG_NAME = "bridge_config.json"
 CHECK_INTERVAL_MS = 60 * 60 * 1000
+BRIDGE_TIMEOUT_SECONDS = 25
+RUNTIME_QUERY_NAMES = {
+    "authuser",
+    "key",
+    "callback",
+    "_",
+    "action",
+    "messageid",
+    "division",
+    "tradcar",
+    "modcar",
+}
+
+
+class BridgeError(RuntimeError):
+    """Safe bridge failure message. Never includes credentials or registration data."""
 
 
 def normalize_url(value: str) -> str:
+    """Return a clean Apps Script /exec endpoint.
+
+    v42 removes Google's browser-only authuser routing before using the bridge.
+    Desktop also removes stale runtime bridge parameters so key/callback/action
+    values cannot be duplicated or encoded twice.
+    """
+
     value = str(value or "").strip()
     if not re.match(r"^https://script\.google\.com/macros/s/", value, re.I):
         return ""
-    if not re.search(r"/exec(?:[?#]|$)", value, re.I):
+
+    parts = urllib.parse.urlsplit(value)
+    if not re.search(r"/exec$", parts.path, re.I):
         return ""
 
-    # Google adds ``authuser`` when an Apps Script URL is copied while more
-    # than one Google account is signed in.  That parameter selects a browser
-    # account before the public Web App is run.  It is not part of the Web App
-    # endpoint and sends a cookie-free desktop client through Google's account
-    # chooser instead of to ContentService.  v42 deliberately removes it in
-    # v36-credentialless.js; Desktop must canonicalize the endpoint the same
-    # way rather than faithfully replaying browser-only account routing.
-    parts = urllib.parse.urlsplit(value)
-    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
-    query = [(name, item) for name, item in query if name.casefold() != "authuser"]
+    query = []
+    for name, item in urllib.parse.parse_qsl(parts.query, keep_blank_values=True):
+        if name.casefold() in RUNTIME_QUERY_NAMES:
+            continue
+        query.append((name, item))
+
     return urllib.parse.urlunsplit(
-        (parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(query), "")
+        (
+            "https",
+            parts.netloc,
+            parts.path,
+            urllib.parse.urlencode(query, doseq=True),
+            "",
+        )
     )
 
 
@@ -70,29 +101,17 @@ def load_config(store) -> dict[str, Any]:
     path = _config_path(store)
     if not path.is_file():
         return {"url": "", "key": "", "ignored": []}
+
     try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return {"url": "", "key": "", "ignored": []}
+
     return {
         "url": str(data.get("url", "")),
         "key": str(data.get("key", "")),
         "ignored": [str(x) for x in (data.get("ignored") or [])][-500:],
     }
-
-
-def load_bridge_connection_file(path: str | Path) -> dict[str, str]:
-    file_path = Path(path)
-    data = json.loads(file_path.read_text(encoding="utf-8"))
-    if not isinstance(data, dict) or data.get("type") != "mnlt-derby-bridge":
-        raise ValueError("That is not an MNLT Derby connection file.")
-    url = normalize_url(str(data.get("url", "")))
-    key = str(data.get("key", ""))
-    if not url:
-        raise ValueError("The connection file does not contain a valid Apps Script Web App URL.")
-    if not key:
-        raise ValueError("The connection file does not contain a Bridge Key.")
-    return {"url": url, "key": key}
 
 
 def save_config(store, data: dict[str, Any]) -> None:
@@ -101,133 +120,139 @@ def save_config(store, data: dict[str, Any]) -> None:
     payload = {
         "url": str(data.get("url", "")),
         "key": str(data.get("key", "")),
-        "ignored": list(dict.fromkeys(str(x) for x in (data.get("ignored") or [])))[-500:],
+        "ignored": list(
+            dict.fromkeys(str(x) for x in (data.get("ignored") or []))
+        )[-500:],
     }
+
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     temp.replace(path)
 
 
-def parse_bridge_payload(text: str, callback: str = "mnltDesktopCallback") -> dict[str, Any]:
-    """Parse Apps Script JSON / JSONP exactly as returned over HTTP."""
-    raw = str(text or "").lstrip("\ufeff").strip()
-    if not raw:
-        raise ValueError("The registration bridge returned an empty response.")
+def load_bridge_connection_file(path: str | Path) -> dict[str, str]:
+    file_path = Path(path)
+    data = json.loads(file_path.read_text(encoding="utf-8"))
 
-    # Google sometimes wraps script/plain text in a tiny HTML page.
-    if raw.startswith("<"):
-        pre = re.search(r"<pre[^>]*>(.*?)</pre>", raw, re.I | re.S)
-        if pre:
-            raw = html.unescape(re.sub(r"<[^>]+>", "", pre.group(1))).strip()
-        else:
-            body = re.search(r"<body[^>]*>(.*?)</body>", raw, re.I | re.S)
-            if body:
-                raw = html.unescape(re.sub(r"<[^>]+>", "", body.group(1))).strip()
+    if not isinstance(data, dict) or data.get("type") != "mnlt-derby-bridge":
+        raise ValueError("That is not an MNLT Derby connection file.")
 
-    # Plain JSON.
-    try:
-        data = json.loads(raw)
-        if isinstance(data, dict):
-            return data
-    except Exception:
-        pass
+    url = normalize_url(str(data.get("url", "")))
+    key = str(data.get("key", ""))
 
-    cleaned = re.sub(r"^\s*/\*.*?\*/\s*", "", raw, flags=re.S)
+    if not url:
+        raise ValueError(
+            "The connection file does not contain a valid Apps Script Web App URL."
+        )
+    if not key:
+        raise ValueError("The connection file does not contain a Bridge Key.")
 
-    # Standard JSONP: callback({...});
-    match = re.match(r"^[A-Za-z_$][\w$]*\s*\((.*)\)\s*;?\s*$", cleaned, re.S)
-    if match:
-        try:
-            data = json.loads(match.group(1))
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
+    return {"url": url, "key": key}
 
-    # Harmless wrapper / XSSI prefix: decode the first JSON object.
-    first = cleaned.find("{")
-    if first >= 0:
-        try:
-            data, _end = json.JSONDecoder().raw_decode(cleaned[first:])
-            if isinstance(data, dict):
-                return data
-        except Exception:
-            pass
 
-    snippet = re.sub(r"\s+", " ", cleaned)[:180]
-    raise ValueError(
-        "The registration bridge returned a response format Desktop v1 did not recognize."
-        + (f" Response began: {snippet}" if snippet else "")
+def _response_classification(response: requests.Response) -> str:
+    body = response.text or ""
+    stripped = body.lstrip()
+    content_type = str(response.headers.get("Content-Type", "")).split(";", 1)[0].strip()
+
+    if not stripped:
+        kind = "empty"
+    elif stripped.startswith("{") or stripped.startswith("["):
+        kind = "json"
+    elif stripped.startswith("<"):
+        kind = "html"
+    elif re.match(r"^[A-Za-z_$][\w$\.]*\s*\(", stripped):
+        kind = "jsonp"
+    else:
+        kind = "text"
+
+    return (
+        f"HTTP {response.status_code} • "
+        f"{content_type or 'unknown content type'} • "
+        f"{len(response.content)} bytes • {kind}"
     )
 
-def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, timeout: int = 25) -> dict[str, Any]:
-    """Call Apps Script with the same GET query used by the working v42 JSONP bridge.
 
-    This runs in a background Python thread and does not use Qt URL rewriting,
-    Chrome cookies, or browser storage.
+def bridge_request(
+    url: str,
+    key: str,
+    params: dict[str, Any] | None = None,
+    timeout: int = BRIDGE_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    """Call Apps Script and return its plain JSON payload.
+
+    Desktop intentionally does NOT send callback. The Apps Script doGet() in
+    MNLT_Registration_Bridge.gs returns application/json when callback is absent.
     """
-    url = normalize_url(url)
-    if not url:
-        raise ValueError("Apps Script Web App URL is invalid.")
 
-    # Do not alter the saved key other than the emptiness check. The downloaded
-    # v42 connection file is the source of truth.
-    key = str(key or "")
-    if not key:
-        raise ValueError("Bridge Key is required.")
+    clean_url = normalize_url(url)
+    if not clean_url:
+        raise BridgeError("Apps Script Web App URL is invalid.")
 
-    callback = f"__mnltBridge_{int(time.time() * 1000)}_desktop"
-    query: dict[str, Any] = {
+    key = str(key if key is not None else "")
+    if key == "":
+        raise BridgeError("Bridge Key is required.")
+
+    query: dict[str, str] = {
         "key": key,
-        "callback": callback,
-        "_": int(time.time() * 1000),
+        "_": str(int(time.time() * 1000)),
     }
-    for k, v in (params or {}).items():
-        query[str(k)] = "" if v is None else str(v)
+    for name, value in (params or {}).items():
+        query[str(name)] = "" if value is None else str(value)
 
     session = requests.Session()
     session.cookies.clear()
+
     try:
         response = session.get(
-            url,
+            clean_url,
             params=query,
             timeout=timeout,
             allow_redirects=True,
             headers={
-                "User-Agent": (
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                    "AppleWebKit/537.36 (KHTML, like Gecko) "
-                    "Chrome/151.0.0.0 Safari/537.36"
-                ),
-                "Accept": "*/*",
+                "User-Agent": "MNLT-Derby-Manager-Desktop-v1",
+                "Accept": "application/json,text/plain;q=0.9,*/*;q=0.5",
                 "Cache-Control": "no-cache",
                 "Pragma": "no-cache",
-                "Referer": "",
             },
         )
     except requests.RequestException as exc:
-        raise ConnectionError(f"Could not reach Apps Script ({exc.__class__.__name__}).") from exc
+        raise BridgeError(
+            f"Could not reach Apps Script ({exc.__class__.__name__})."
+        ) from exc
 
-    body = response.text.lstrip("\ufeff").strip()
+    diagnostic = _response_classification(response)
+    body = response.text or ""
     low = body.casefold()
 
     if "accounts.google.com" in low or ("sign in" in low and "google" in low):
-        raise ConnectionError(
-            "Google returned a sign-in page. The Apps Script deployment must allow Anyone access."
-        )
-    if response.status_code != 200:
-        snippet = re.sub(r"\s+", " ", body)[:180]
-        raise ConnectionError(
-            f"Apps Script returned HTTP {response.status_code}."
-            + (f" Response began: {snippet}" if snippet else "")
+        raise BridgeError(
+            "Google returned a sign-in page. "
+            f"{diagnostic}. The Web App deployment must allow Anyone access."
         )
 
-    return parse_bridge_payload(body, callback)
+    if response.status_code != 200:
+        raise BridgeError(f"Apps Script request failed. {diagnostic}.")
+
+    try:
+        data = response.json()
+    except ValueError as exc:
+        raise BridgeError(
+            "Apps Script did not return plain JSON. "
+            f"{diagnostic}. Desktop v1 uses the JSON endpoint only."
+        ) from exc
+
+    if not isinstance(data, dict):
+        raise BridgeError(f"Apps Script returned an invalid JSON payload. {diagnostic}.")
+
+    return data
+
 
 def _division(value: str) -> str:
     value = str(value or "").strip()
     if value in {"Traditional", "Modified", "Both"}:
         return value
+
     low = value.casefold()
     if "both" in low:
         return "Both"
@@ -236,28 +261,38 @@ def _division(value: str) -> str:
     return "Traditional"
 
 
-def filter_new_signups(state: dict[str, Any], rows: list[dict[str, Any]], ignored: list[str]) -> list[dict[str, Any]]:
-    known_ids = set(str(x) for x in ignored)
-    existing_names = set()
+def filter_new_signups(
+    state: dict[str, Any],
+    rows: list[dict[str, Any]],
+    ignored: list[str],
+) -> list[dict[str, Any]]:
+    known_ids = {str(x) for x in ignored}
+    existing_names: set[str] = set()
+
     for reg in state.get("registrations", []):
         existing_names.add(str(reg.get("name", "")).strip().casefold())
         for field in ("sourceMessageId", "gmailMessageId"):
             if reg.get(field):
                 known_ids.add(str(reg[field]))
-    out = []
+
+    out: list[dict[str, Any]] = []
     for row in rows or []:
         if not isinstance(row, dict):
             continue
-        mid = str(row.get("messageId", "")).strip()
+
+        message_id = str(row.get("messageId", "")).strip()
         name = str(row.get("name", "")).strip()
-        if not mid or not name:
+
+        if not message_id or not name:
             continue
-        if mid in known_ids:
+        if message_id in known_ids:
             continue
         if name.casefold() in existing_names:
             continue
+
         out.append(copy.deepcopy(row))
-    out.sort(key=lambda x: str(x.get("receivedAt", "")))
+
+    out.sort(key=lambda item: str(item.get("receivedAt", "")))
     return out
 
 
@@ -270,24 +305,28 @@ class EmailRegistrationPage(QWidget):
         self._future = None
         self._future_kind = ""
         self._draft_context = None
-        self._web_request = None
 
         layout = QVBoxLayout(self)
+
         title = QLabel("Email Registration")
-        f = title.font()
-        f.setPointSize(22)
-        f.setBold(True)
-        title.setFont(f)
+        font = title.font()
+        font.setPointSize(22)
+        font.setBold(True)
+        title.setFont(font)
         layout.addWidget(title)
-        layout.addWidget(QLabel("Pull new SnapPages derby signups from the existing Gmail Apps Script bridge."))
+        layout.addWidget(
+            QLabel("Pull new SnapPages derby signups from the Gmail Apps Script bridge.")
+        )
 
         setup = QGroupBox("Gmail Registration Bridge")
         setup_layout = QVBoxLayout(setup)
+
         self.url = QLineEdit()
         self.url.setPlaceholderText("https://script.google.com/macros/s/.../exec")
         self.key = QLineEdit()
         self.key.setEchoMode(QLineEdit.Password)
         self.key.setPlaceholderText("Bridge Key")
+
         setup_layout.addWidget(QLabel("Apps Script Web App URL"))
         setup_layout.addWidget(self.url)
         setup_layout.addWidget(QLabel("Bridge Key"))
@@ -299,12 +338,15 @@ class EmailRegistrationPage(QWidget):
         self.save_btn.setObjectName("primary")
         self.check_btn = QPushButton("CHECK NOW")
         self.disconnect_btn = QPushButton("DISCONNECT")
+
         buttons.addWidget(self.import_btn)
         buttons.addWidget(self.save_btn)
         buttons.addWidget(self.check_btn)
         buttons.addWidget(self.disconnect_btn)
         buttons.addStretch()
+
         setup_layout.addLayout(buttons)
+
         self.status = QLabel("Not set up")
         self.status.setWordWrap(True)
         setup_layout.addWidget(self.status)
@@ -312,12 +354,16 @@ class EmailRegistrationPage(QWidget):
 
         list_box = QGroupBox("New Registrations Waiting")
         list_layout = QVBoxLayout(list_box)
+
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Racer", "Contact", "Requested Entry", "Received"])
+        self.table.setHorizontalHeaderLabels(
+            ["Racer", "Contact", "Requested Entry", "Received"]
+        )
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.table.setSelectionBehavior(QTableWidget.SelectRows)
         self.table.setSelectionMode(QTableWidget.SingleSelection)
         list_layout.addWidget(self.table)
+
         actions = QHBoxLayout()
         self.review_btn = QPushButton("REVIEW SELECTED")
         self.review_btn.setObjectName("primary")
@@ -326,6 +372,7 @@ class EmailRegistrationPage(QWidget):
         actions.addWidget(self.ignore_btn)
         actions.addStretch()
         list_layout.addLayout(actions)
+
         layout.addWidget(list_box, 1)
 
         self.import_btn.clicked.connect(self.import_connection_file)
@@ -339,6 +386,7 @@ class EmailRegistrationPage(QWidget):
         self.poll_timer = QTimer(self)
         self.poll_timer.setInterval(100)
         self.poll_timer.timeout.connect(self._poll_future)
+
         self.auto_timer = QTimer(self)
         self.auto_timer.setInterval(CHECK_INTERVAL_MS)
         self.auto_timer.timeout.connect(lambda: self.check_now(False))
@@ -349,7 +397,7 @@ class EmailRegistrationPage(QWidget):
             QTimer.singleShot(1200, lambda: self.check_now(False))
 
     def connection_ready(self) -> bool:
-        return bool(normalize_url(self.url.text()) and self.key.text().strip())
+        return bool(normalize_url(self.url.text()) and self.key.text() != "")
 
     def load_connection(self) -> None:
         cfg = load_config(self.manager.store)
@@ -362,10 +410,11 @@ class EmailRegistrationPage(QWidget):
             self,
             "Import v42 Gmail Connection",
             "",
-            "MNLT Derby Connection (*.mnltbridge);;JSON Files (*.json);;All Files (*.*)",
+            "MNLT Derby Connection (*.mnltbridge *.json);;JSON Files (*.json);;All Files (*.*)",
         )
         if not path:
             return
+
         try:
             imported = load_bridge_connection_file(path)
         except Exception as exc:
@@ -375,26 +424,34 @@ class EmailRegistrationPage(QWidget):
         cfg = load_config(self.manager.store)
         cfg.update(imported)
         save_config(self.manager.store, cfg)
+
         self.url.setText(imported["url"])
         self.key.setText(imported["key"])
-        self.status.setText("v42 connection imported. Checking Gmail registration bridge…")
+        self.status.setText("v42 connection imported. Checking…")
         self.auto_timer.start()
         self.check_now(True)
 
     def save_connection(self) -> None:
         url = normalize_url(self.url.text())
         key = self.key.text()
+
         if not url:
-            QMessageBox.warning(self, "Gmail Bridge", "Paste the Apps Script Web App URL ending in /exec.")
+            QMessageBox.warning(
+                self,
+                "Gmail Bridge",
+                "Paste the Apps Script Web App URL ending in /exec.",
+            )
             return
-        if not key:
+        if key == "":
             QMessageBox.warning(self, "Gmail Bridge", "Paste the Bridge Key.")
             return
+
         cfg = load_config(self.manager.store)
         cfg.update({"url": url, "key": key})
         save_config(self.manager.store, cfg)
+
         self.url.setText(url)
-        self.status.setText("Connection saved. Checking Gmail registration bridge…")
+        self.status.setText("Connection saved. Checking…")
         self.auto_timer.start()
         self.check_now(True)
 
@@ -403,6 +460,7 @@ class EmailRegistrationPage(QWidget):
         cfg["url"] = ""
         cfg["key"] = ""
         save_config(self.manager.store, cfg)
+
         self.url.clear()
         self.key.clear()
         self.incoming = []
@@ -413,166 +471,154 @@ class EmailRegistrationPage(QWidget):
     def check_now(self, manual: bool = True) -> None:
         if self._future is not None:
             return
-        url = normalize_url(self.url.text())
-        key = self.key.text().strip()
-        if not url or not key:
-            if manual:
-                QMessageBox.information(self, "Gmail Bridge", "Save the Apps Script Web App URL and Bridge Key first.")
-            return
-        self.status.setText("Checking for new registrations…")
-        self.check_btn.setEnabled(False)
-        self._start_web_request("check", {}, None)
 
-    def _start_web_request(self, kind: str, params: dict[str, Any], context: dict[str, Any] | None) -> None:
-        if self._future is not None:
-            return
         cfg = load_config(self.manager.store)
         url = normalize_url(cfg.get("url", "") or self.url.text())
         key = str(cfg.get("key", "") or self.key.text())
-        if not url or not key:
+
+        if not url or key == "":
+            if manual:
+                QMessageBox.information(
+                    self,
+                    "Gmail Bridge",
+                    "Save or import the Apps Script connection first.",
+                )
+            return
+
+        self.status.setText("Checking for new registrations…")
+        self.check_btn.setEnabled(False)
+        self._start_request("check", {}, None)
+
+    def _start_request(
+        self,
+        kind: str,
+        params: dict[str, Any],
+        context: dict[str, Any] | None,
+    ) -> None:
+        if self._future is not None:
+            return
+
+        cfg = load_config(self.manager.store)
+        url = normalize_url(cfg.get("url", "") or self.url.text())
+        key = str(cfg.get("key", "") or self.key.text())
+
+        if not url or key == "":
             self.check_btn.setEnabled(True)
             self.status.setText("Not set up")
             return
+
         self._future_kind = kind
         self._draft_context = copy.deepcopy(context) if context else None
         self._future = self._executor.submit(bridge_request, url, key, params)
         self.poll_timer.start()
 
-    def _web_finished(self, data: object, error: object) -> None:
-        kind = self._future_kind
-        context = self._draft_context
-        request = self._web_request
-        self._web_request = None
-        self._future_kind = ""
-        self._draft_context = None
-        self.check_btn.setEnabled(True)
-
-        if error:
-            if kind == "check":
-                self.status.setText(f"Connection problem — {error}")
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Gmail Draft",
-                    f"Racer was saved, but the Gmail draft could not be created.\n\n{error}",
-                )
-            if request:
-                request.deleteLater()
-            return
-
-        if not isinstance(data, dict):
-            if kind == "check":
-                self.status.setText("Connection problem — Apps Script returned an invalid payload.")
-            else:
-                QMessageBox.warning(self, "Gmail Draft", "Racer was saved, but Apps Script returned an invalid payload.")
-            if request:
-                request.deleteLater()
-            return
-
-        if kind == "check":
-            if data.get("ok") is not True:
-                detail = str(data.get("error") or "the bridge did not approve the request")
-                self.status.setText(f"Connection problem — {detail}.")
-            else:
-                cfg = load_config(self.manager.store)
-                self.incoming = filter_new_signups(
-                    self.manager.state,
-                    data.get("registrations") if isinstance(data.get("registrations"), list) else [],
-                    cfg.get("ignored", []),
-                )
-                self.status.setText(
-                    f"Connected • {len(self.incoming)} new registration"
-                    + ("" if len(self.incoming) == 1 else "s")
-                    + " waiting"
-                )
-                self.refresh_table()
-        elif kind == "draft":
-            if data.get("ok") is True and data.get("draftCreated"):
-                missing = data.get("missingAttachments") if isinstance(data.get("missingAttachments"), list) else []
-                if missing:
-                    QMessageBox.information(
-                        self,
-                        "Gmail Draft Created",
-                        "Racer saved and Gmail confirmation draft created.\n\nOne or more rule PDF attachments need attention.",
-                    )
-                else:
-                    QMessageBox.information(self, "Gmail Draft Created", "Racer saved and Gmail confirmation draft created.")
-            else:
-                QMessageBox.warning(
-                    self,
-                    "Gmail Draft",
-                    "Racer was saved, but the Apps Script bridge did not create a draft. The bridge may still need the draft-capable server update.",
-                )
-            if context:
-                self.mark_imported(str(context.get("messageId", "")))
-
-        if request:
-            request.deleteLater()
-
     def _poll_future(self) -> None:
         if self._future is None or not self._future.done():
             return
+
         future = self._future
         kind = self._future_kind
         context = self._draft_context
+
         self._future = None
         self._future_kind = ""
         self._draft_context = None
         self.poll_timer.stop()
         self.check_btn.setEnabled(True)
+
         try:
             data = future.result()
         except Exception as exc:
             if kind == "check":
                 self.status.setText(f"Connection problem — {exc}")
             else:
-                QMessageBox.warning(self, "Gmail Draft", f"Racer was saved, but the Gmail draft could not be created.\n\n{exc}")
-            return
-
-        if kind == "check":
-            if data.get("ok") is not True:
-                detail = str(data.get("error") or "the bridge did not approve the request")
-                self.status.setText(f"Connection problem — {detail}.")
-                return
-            cfg = load_config(self.manager.store)
-            self.incoming = filter_new_signups(
-                self.manager.state,
-                data.get("registrations") if isinstance(data.get("registrations"), list) else [],
-                cfg.get("ignored", []),
-            )
-            self.status.setText(
-                f"Connected • {len(self.incoming)} new registration"
-                + ("" if len(self.incoming) == 1 else "s")
-                + " waiting"
-            )
-            self.refresh_table()
-        elif kind == "draft":
-            if data.get("ok") is True and data.get("draftCreated"):
-                missing = data.get("missingAttachments") if isinstance(data.get("missingAttachments"), list) else []
-                if missing:
-                    QMessageBox.information(
-                        self,
-                        "Gmail Draft Created",
-                        "Racer saved and Gmail confirmation draft created.\n\nOne or more rule PDF attachments need attention.",
-                    )
-                else:
-                    QMessageBox.information(self, "Gmail Draft Created", "Racer saved and Gmail confirmation draft created.")
-            else:
                 QMessageBox.warning(
                     self,
                     "Gmail Draft",
-                    "Racer was saved, but the Apps Script bridge did not create a draft. The bridge may still need the draft-capable server update.",
+                    "Racer was saved, but the Gmail draft could not be created.\n\n"
+                    + str(exc),
                 )
-            if context:
-                self.mark_imported(str(context.get("messageId", "")))
+            return
+
+        if kind == "check":
+            self._finish_check(data)
+        elif kind == "draft":
+            self._finish_draft(data, context)
+
+    def _finish_check(self, data: dict[str, Any]) -> None:
+        if data.get("ok") is not True:
+            detail = str(data.get("error") or "the bridge did not approve the request")
+            self.status.setText(f"Connection problem — {detail}.")
+            return
+
+        cfg = load_config(self.manager.store)
+        rows = data.get("registrations")
+        self.incoming = filter_new_signups(
+            self.manager.state,
+            rows if isinstance(rows, list) else [],
+            cfg.get("ignored", []),
+        )
+        self.status.setText(
+            f"Connected • {len(self.incoming)} new registration"
+            + ("" if len(self.incoming) == 1 else "s")
+            + " waiting"
+        )
+        self.refresh_table()
+
+    def _finish_draft(
+        self,
+        data: dict[str, Any],
+        context: dict[str, Any] | None,
+    ) -> None:
+        if data.get("ok") is True and data.get("draftCreated") is True:
+            missing = (
+                data.get("missingAttachments")
+                if isinstance(data.get("missingAttachments"), list)
+                else []
+            )
+            if missing:
+                QMessageBox.information(
+                    self,
+                    "Gmail Draft Created",
+                    "Racer saved and Gmail confirmation draft created.\n\n"
+                    "One or more rule PDF attachments need attention.",
+                )
+            else:
+                QMessageBox.information(
+                    self,
+                    "Gmail Draft Created",
+                    "Racer saved and Gmail confirmation draft created.",
+                )
+        elif data.get("ok") is True:
+            QMessageBox.information(
+                self,
+                "Gmail Draft",
+                "Racer saved. The connected Apps Script bridge does not have "
+                "Gmail draft creation enabled yet.",
+            )
+        else:
+            detail = str(data.get("error") or "the bridge did not create the draft")
+            QMessageBox.warning(
+                self,
+                "Gmail Draft",
+                f"Racer was saved, but the Gmail draft could not be created.\n\n{detail}",
+            )
+
+        if context:
+            self.mark_imported(str(context.get("messageId", "")))
 
     def refresh_from_state(self) -> None:
         cfg = load_config(self.manager.store)
-        self.incoming = filter_new_signups(self.manager.state, self.incoming, cfg.get("ignored", []))
+        self.incoming = filter_new_signups(
+            self.manager.state,
+            self.incoming,
+            cfg.get("ignored", []),
+        )
         self.refresh_table()
 
     def refresh_table(self) -> None:
         self.table.setRowCount(len(self.incoming))
+
         for row_index, row in enumerate(self.incoming):
             contact = str(row.get("email") or row.get("phone") or "")
             values = [
@@ -596,11 +642,21 @@ class EmailRegistrationPage(QWidget):
     def review_selected(self) -> None:
         signup = self._selected_signup()
         if not signup:
-            QMessageBox.information(self, "Email Registration", "Select a registration first.")
+            QMessageBox.information(
+                self, "Email Registration", "Select a registration first."
+            )
             return
+
         name = str(signup.get("name", "")).strip()
-        if any(str(r.get("name", "")).strip().casefold() == name.casefold() for r in self.manager.state.get("registrations", [])):
-            QMessageBox.information(self, "Already Registered", f"{name} is already in Registration.")
+        if any(
+            str(reg.get("name", "")).strip().casefold() == name.casefold()
+            for reg in self.manager.state.get("registrations", [])
+        ):
+            QMessageBox.information(
+                self,
+                "Already Registered",
+                f"{name} is already in Registration.",
+            )
             self.mark_imported(str(signup.get("messageId", "")))
             return
 
@@ -608,67 +664,92 @@ class EmailRegistrationPage(QWidget):
         page.clear()
         page.name.setText(name)
         page.age.setValue(0)
-        page.contact.setText(" | ".join(x for x in [str(signup.get("email", "")).strip(), str(signup.get("phone", "")).strip()] if x))
-        page.division.setCurrentText(_division(signup.get("division") or signup.get("choice")))
+        page.contact.setText(
+            " | ".join(
+                item
+                for item in [
+                    str(signup.get("email", "")).strip(),
+                    str(signup.get("phone", "")).strip(),
+                ]
+                if item
+            )
+        )
+        page.division.setCurrentText(
+            _division(signup.get("division") or signup.get("choice"))
+        )
         page.trad_car.clear()
         page.mod_car.clear()
         page.status.setCurrentText("Registered")
         page.rules.setChecked(False)
         page.notes.setPlainText("Imported from SnapPages registration email")
+
         if hasattr(page, "set_bridge_pending"):
             page.set_bridge_pending(copy.deepcopy(signup))
+
         self.manager.open_page(page)
 
     def ignore_selected(self) -> None:
         signup = self._selected_signup()
         if not signup:
-            QMessageBox.information(self, "Email Registration", "Select a registration first.")
+            QMessageBox.information(
+                self, "Email Registration", "Select a registration first."
+            )
             return
-        mid = str(signup.get("messageId", ""))
+
+        message_id = str(signup.get("messageId", ""))
         cfg = load_config(self.manager.store)
-        cfg.setdefault("ignored", []).append(mid)
+        cfg.setdefault("ignored", []).append(message_id)
         save_config(self.manager.store, cfg)
-        self.incoming = [x for x in self.incoming if str(x.get("messageId", "")) != mid]
+
+        self.incoming = [
+            item
+            for item in self.incoming
+            if str(item.get("messageId", "")) != message_id
+        ]
         self.refresh_table()
         self.status.setText("Registration ignored.")
 
     def mark_imported(self, message_id: str) -> None:
         if not message_id:
             return
-        self.incoming = [x for x in self.incoming if str(x.get("messageId", "")) != str(message_id)]
+
+        self.incoming = [
+            item
+            for item in self.incoming
+            if str(item.get("messageId", "")) != str(message_id)
+        ]
         self.refresh_table()
 
-    def create_draft_for(self, pending: dict[str, Any], saved: dict[str, Any]) -> None:
+    def create_draft_for(
+        self,
+        pending: dict[str, Any],
+        saved: dict[str, Any],
+    ) -> None:
         if self._future is not None:
             QMessageBox.information(
                 self,
                 "Gmail Draft",
-                "Racer saved. The bridge is busy right now, so create the Gmail draft after the current email check finishes.",
+                "Racer saved. The bridge is busy right now, so create the Gmail "
+                "draft after the current check finishes.",
             )
             return
-        cfg = load_config(self.manager.store)
-        url = normalize_url(cfg.get("url", ""))
-        key = str(cfg.get("key", ""))
-        if not url or not key:
-            QMessageBox.information(
-                self,
-                "Gmail Draft",
-                "Racer saved. Reconnect the Gmail registration bridge to create the confirmation draft.",
-            )
-            return
+
         params = {
             "action": "createDraft",
             "messageId": pending.get("messageId", ""),
-            "division": saved.get("division") or pending.get("division") or "Traditional",
+            "division": saved.get("division")
+            or pending.get("division")
+            or "Traditional",
             "tradCar": saved.get("tradCar", ""),
             "modCar": saved.get("modCar", ""),
         }
+
         self.status.setText("Creating Gmail confirmation draft…")
-        self._start_web_request("draft", params, pending)
+        self._start_request("draft", params, pending)
 
 
 def install(desktop_app) -> None:
-    """Install the email-registration page and Registration review workflow."""
+    """Install Email Registration and its Registration review integration."""
 
     if getattr(desktop_app, "_gmail_bridge_v1_installed", False):
         return
@@ -680,47 +761,74 @@ def install(desktop_app) -> None:
 
     def reg_init(self, manager):
         base_reg_init(self, manager)
+
         self._bridge_pending = None
         self._bridge_notice = QLabel("")
         self._bridge_notice.setWordWrap(True)
         self._bridge_notice.setStyleSheet("color:#f2ca69;font-weight:bold;")
         self._bridge_notice.hide()
-        self._bridge_draft = QCheckBox("Create Gmail confirmation draft after saving")
+
+        self._bridge_draft = QCheckBox(
+            "Create Gmail confirmation draft after saving"
+        )
         self._bridge_draft.setChecked(True)
         self._bridge_draft.hide()
 
-        form_box = next((x for x in self.findChildren(QGroupBox) if x.title() == "Add / Edit Registration"), None)
+        form_box = next(
+            (
+                widget
+                for widget in self.findChildren(QGroupBox)
+                if widget.title() == "Add / Edit Registration"
+            ),
+            None,
+        )
         form = form_box.layout() if form_box else None
         if form is not None:
             insert_at = max(0, form.rowCount() - 1)
             form.insertRow(insert_at, self._bridge_notice)
             form.insertRow(insert_at + 1, "", self._bridge_draft)
 
-        self._bridge_save_button = next((x for x in self.findChildren(QPushButton) if x.text() == "SAVE RACER"), None)
+        self._bridge_save_button = next(
+            (
+                widget
+                for widget in self.findChildren(QPushButton)
+                if widget.text() == "SAVE RACER"
+            ),
+            None,
+        )
 
     def clear_pending_ui(self):
         self._bridge_pending = None
+
         if hasattr(self, "_bridge_notice"):
             self._bridge_notice.clear()
             self._bridge_notice.hide()
+
         if hasattr(self, "_bridge_draft"):
             self._bridge_draft.hide()
             self._bridge_draft.setChecked(True)
+
         if getattr(self, "_bridge_save_button", None):
             self._bridge_save_button.setText("SAVE RACER")
 
     def set_bridge_pending(self, signup: dict[str, Any]) -> None:
         self._bridge_pending = copy.deepcopy(signup)
+
         if hasattr(self, "_bridge_notice"):
             self._bridge_notice.setText(
-                "REVIEW EMAIL REGISTRATION — check the fields, add the car name if available, then save."
+                "REVIEW EMAIL REGISTRATION — check the fields, add the car name "
+                "if available, then save."
             )
             self._bridge_notice.show()
+
         if hasattr(self, "_bridge_draft"):
             self._bridge_draft.show()
             self._bridge_draft.setChecked(True)
+
         if getattr(self, "_bridge_save_button", None):
-            self._bridge_save_button.setText("SAVE RACER + CREATE EMAIL DRAFT")
+            self._bridge_save_button.setText(
+                "SAVE RACER + CREATE EMAIL DRAFT"
+            )
 
     def reg_clear(self):
         base_reg_clear(self)
@@ -728,28 +836,42 @@ def install(desktop_app) -> None:
 
     def reg_save(self):
         pending = copy.deepcopy(getattr(self, "_bridge_pending", None))
-        want_draft = bool(getattr(self, "_bridge_draft", None) and self._bridge_draft.isChecked())
-        before_ids = {r.get("id") for r in self.manager.state.get("registrations", [])}
+        want_draft = bool(
+            getattr(self, "_bridge_draft", None)
+            and self._bridge_draft.isChecked()
+        )
+
+        before_ids = {
+            reg.get("id") for reg in self.manager.state.get("registrations", [])
+        }
         wanted_name = self.name.text().strip().casefold()
+
         base_reg_save(self)
+
         if not pending:
             return
+
         saved = next(
             (
-                r
-                for r in self.manager.state.get("registrations", [])
-                if r.get("id") not in before_ids and str(r.get("name", "")).strip().casefold() == wanted_name
+                reg
+                for reg in self.manager.state.get("registrations", [])
+                if reg.get("id") not in before_ids
+                and str(reg.get("name", "")).strip().casefold() == wanted_name
             ),
             None,
         )
         if not saved:
             return
+
         saved["sourceMessageId"] = str(pending.get("messageId", ""))
         saved["email"] = str(pending.get("email", "")).strip()
         saved["phone"] = str(pending.get("phone", "")).strip()
+
         if not saved.get("notes"):
             saved["notes"] = "Imported from SnapPages registration email"
+
         self.manager.save("email-registration-import")
+
         email_page = getattr(self.manager, "email_registration", None)
         if email_page:
             email_page.mark_imported(str(pending.get("messageId", "")))
@@ -766,16 +888,20 @@ def install(desktop_app) -> None:
 
     def main_init(self):
         base_main_init(self)
+
         self.email_registration = EmailRegistrationPage(self)
         self.stack.insertWidget(2, self.email_registration)
 
         outer = self.centralWidget().layout()
         body = outer.itemAt(1).layout() if outer and outer.count() > 1 else None
         nav = body.itemAt(0).layout() if body and body.count() else None
+
         if nav is not None:
             button = QPushButton("Email Registration")
             button.setMinimumHeight(48)
-            button.clicked.connect(lambda: self.open_page(self.email_registration))
+            button.clicked.connect(
+                lambda: self.open_page(self.email_registration)
+            )
             nav.insertWidget(2, button)
 
     def refresh_all(self):
