@@ -45,3 +45,20 @@ def test_parse_bridge_payload_accepts_wrapper_variants():
     assert parse_bridge_payload("/**/__mnltBridge_desktop(" + raw + ");") == obj
     assert parse_bridge_payload("__mnltBridge_desktop && __mnltBridge_desktop(" + raw + ");") == obj
     assert parse_bridge_payload(")]}'\n" + raw) == obj
+
+
+def test_load_bridge_connection_file(tmp_path):
+    import json
+    from gmail_bridge import load_bridge_connection_file
+
+    path = tmp_path / "MNLT_Derby_Connection.mnltbridge"
+    path.write_text(json.dumps({
+        "type": "mnlt-derby-bridge",
+        "version": 1,
+        "url": "https://script.google.com/macros/s/TEST/exec",
+        "key": "secret-key"
+    }), encoding="utf-8")
+
+    cfg = load_bridge_connection_file(path)
+    assert cfg["url"].endswith("/exec")
+    assert cfg["key"] == "secret-key"
