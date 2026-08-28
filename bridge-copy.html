@@ -26,11 +26,11 @@ button.secondary{background:#294967;color:white}
     <p>This page reads the same saved browser connection used by v42. It does not display the Bridge Key.</p>
     <div id="status" class="status">Checking saved connection…</div>
     <div class="row">
-      <button id="downloadCfg">DOWNLOAD DESKTOP CONNECTION</button>
+      <button id="downloadCfg">DOWNLOAD DESKTOP CONNECTION (.JSON)</button>
       <button id="copyKey" class="secondary">COPY BRIDGE KEY</button>
       <button id="copyUrl" class="secondary">COPY WEB APP URL</button>
     </div>
-    <div class="small">Use DOWNLOAD DESKTOP CONNECTION if copy/paste is giving you trouble. The file contains the same saved v42 Web App URL and Bridge Key and is meant only for Desktop v1.</div>
+    <div class="small">Use DOWNLOAD DESKTOP CONNECTION (.JSON) if copy/paste is giving you trouble. The file contains the same saved v42 Web App URL and Bridge Key and is meant only for Desktop v1.</div>
   </div>
 </div>
 <script>
@@ -67,11 +67,11 @@ document.getElementById('downloadCfg').onclick=()=>{
   const blob=new Blob([JSON.stringify(payload,null,2)],{type:'application/json'});
   const a=document.createElement('a');
   a.href=URL.createObjectURL(blob);
-  a.download='MNLT_Derby_Connection.mnltbridge';
+  a.download='MNLT_Derby_Connection.json';
   document.body.appendChild(a);
   a.click();
   setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000);
-  status.textContent='Desktop connection file downloaded. Import it in Desktop v1.';
+  status.textContent='Desktop connection JSON downloaded. Import it in Desktop v1.';
   status.classList.remove('bad');
 };
 document.getElementById('copyKey').onclick=()=>copyText(cfg&&cfg.key,'Bridge Key');
