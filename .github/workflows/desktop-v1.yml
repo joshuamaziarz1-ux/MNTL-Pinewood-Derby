@@ -61,6 +61,7 @@ jobs:
           $manifest | ConvertTo-Json | Set-Content -Encoding UTF8 desktop-v1-manifest.json
 
       - name: Publish Desktop v1 latest app
+        if: github.ref == 'refs/heads/main'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
