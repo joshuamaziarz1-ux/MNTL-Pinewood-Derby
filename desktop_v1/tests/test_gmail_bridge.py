@@ -64,12 +64,15 @@ def test_load_bridge_connection_file(tmp_path):
     assert cfg["key"] == "secret-key"
 
 
-def test_bridge_request_matches_v42_get_through_redirect():
+def test_bridge_request_matches_v42_get_through_redirect(monkeypatch):
     import json
     import threading
     import urllib.parse
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    import gmail_bridge
     from gmail_bridge import bridge_request
+
+    monkeypatch.setattr(gmail_bridge, "normalize_url", lambda value: str(value))
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
