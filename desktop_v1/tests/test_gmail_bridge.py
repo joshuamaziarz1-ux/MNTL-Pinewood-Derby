@@ -1,12 +1,23 @@
 import json
 
-from gmail_bridge import _division, filter_new_signups, parse_bridge_payload
+from gmail_bridge import _division, filter_new_signups, normalize_url, parse_bridge_payload
 
 
 def test_parse_bridge_payload_accepts_json_and_jsonp():
     obj = {"ok": True, "registrations": [{"messageId": "abc", "name": "Racer"}]}
     assert parse_bridge_payload(json.dumps(obj)) == obj
     assert parse_bridge_payload("mnltDesktopCallback(" + json.dumps(obj) + ");") == obj
+
+
+def test_normalize_url_removes_google_account_routing_like_v42():
+    url = (
+        "https://script.google.com/macros/s/DEPLOYMENT/exec"
+        "?authuser=1&existing=value#browser-fragment"
+    )
+
+    assert normalize_url(url) == (
+        "https://script.google.com/macros/s/DEPLOYMENT/exec?existing=value"
+    )
 
 
 def test_division_mapping_handles_snappages_labels():
