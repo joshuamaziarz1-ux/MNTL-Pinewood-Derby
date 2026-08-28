@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Bridge Copy</title>
+<style>
+body{margin:0;background:#0b1a2a;color:#fff;font-family:Arial,sans-serif}
+.wrap{max-width:720px;margin:50px auto;padding:24px}
+.card{background:#13283e;border:1px solid #35516c;border-radius:14px;padding:24px}
+h1{margin:0 0 8px;font-size:30px}
+p{color:#b8c7d7;line-height:1.5}
+.status{margin:18px 0;padding:12px;border-radius:9px;background:#173c29;color:#a8efbc;font-weight:700}
+.status.bad{background:#3a2025;color:#ffb0b7}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+button{border:0;border-radius:9px;padding:15px 18px;font-size:16px;font-weight:800;cursor:pointer;background:#d8a63d;color:#111820}
+button.secondary{background:#294967;color:white}
+.small{font-size:13px;color:#93a8bc;margin-top:18px}
+@media(max-width:640px){.row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="card">
+    <h1>MNLT Derby Email Connection</h1>
+    <p>This page reads the same saved browser connection used by v42. It does not display the Bridge Key.</p>
+    <div id="status" class="status">Checking saved connection…</div>
+    <div class="row">
+      <button id="copyKey">COPY BRIDGE KEY</button>
+      <button id="copyUrl" class="secondary">COPY WEB APP URL</button>
+    </div>
+    <div class="small">After copying, paste directly into Desktop v1. Do not paste the Bridge Key into chat.</div>
+  </div>
+</div>
+<script>
+const CFG='mnltDerbyRegistrationBridgeV1';
+let cfg=null;
+try{cfg=JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){}
+const status=document.getElementById('status');
+if(cfg&&cfg.url&&cfg.key){
+  status.textContent='Saved v42 connection found. Key length: '+String(cfg.key).length+' characters.';
+}else{
+  status.textContent='No saved v42 connection was found in this browser.';
+  status.classList.add('bad');
+}
+async function copyText(text,label){
+  if(!text)return;
+  try{
+    await navigator.clipboard.writeText(text);
+  }catch(e){
+    const ta=document.createElement('textarea');
+    ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.focus();ta.select();document.execCommand('copy');ta.remove();
+  }
+  status.textContent=label+' copied. Paste it directly into Desktop v1.';
+  status.classList.remove('bad');
+}
+document.getElementById('copyKey').onclick=()=>copyText(cfg&&cfg.key,'Bridge Key');
+document.getElementById('copyUrl').onclick=()=>copyText(cfg&&cfg.url,'Web App URL');
+</script>
+</body>
+</html>
