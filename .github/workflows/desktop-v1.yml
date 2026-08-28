@@ -11,7 +11,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: desktop-v1-release
+  group: desktop-v1-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
