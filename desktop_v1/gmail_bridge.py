@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import copy
 import json
+import os
 import re
 import time
 import urllib.parse
@@ -127,6 +128,14 @@ def save_config(store, data: dict[str, Any]) -> None:
 
     temp = path.with_suffix(".tmp")
     temp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    # The bridge key is a credential.  Restrict the temporary file before the
+    # atomic replace so there is never a world-readable version on POSIX.  On
+    # Windows chmod is best-effort; the user's data-directory ACL remains the
+    # primary protection there.
+    try:
+        os.chmod(temp, 0o600)
+    except OSError:
+        pass
     temp.replace(path)
 
 
@@ -198,7 +207,13 @@ def bridge_request(
         "_": str(int(time.time() * 1000)),
     }
     for name, value in (params or {}).items():
-        query[str(name)] = "" if value is None else str(value)
+        normalized_name = str(name)
+        # Authentication, cache busting, and response format are owned by this
+        # transport.  In particular, no caller can accidentally turn the
+        # Desktop request into JSONP or replace the exact imported key.
+        if normalized_name.casefold() in {"key", "callback", "_"}:
+            continue
+        query[normalized_name] = "" if value is None else str(value)
 
     session = requests.Session()
     session.cookies.clear()

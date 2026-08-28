@@ -1,4 +1,6 @@
 import json
+import os
+import stat
 import threading
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -12,7 +14,9 @@ from gmail_bridge import (
     bridge_request,
     filter_new_signups,
     load_bridge_connection_file,
+    load_config,
     normalize_url,
+    save_config,
 )
 
 
@@ -74,6 +78,24 @@ def test_load_bridge_connection_file_preserves_key_exactly(tmp_path):
     cfg = load_bridge_connection_file(path)
     assert cfg["url"] == "https://script.google.com/macros/s/TEST/exec"
     assert cfg["key"] == exact_key
+
+
+def test_local_config_preserves_key_and_is_private(tmp_path):
+    class Store:
+        data_dir = tmp_path
+
+    exact_key = "  v42-key+with/special=chars==  "
+    save_config(Store(), {"url": "https://example.invalid", "key": exact_key})
+
+    assert load_config(Store())["key"] == exact_key
+    config_path = tmp_path / gmail_bridge.CONFIG_NAME
+    assert config_path.is_file()
+
+    # POSIX chmod controls group/other permission bits. Windows uses ACLs
+    # instead, and Python's st_mode does not represent those ACLs.
+    if os.name != "nt":
+        mode = stat.S_IMODE(config_path.stat().st_mode)
+        assert mode & 0o077 == 0
 
 
 class _BridgeHandler(BaseHTTPRequestHandler):
@@ -139,7 +161,11 @@ def test_bridge_request_uses_plain_json_and_never_sends_callback(monkeypatch):
         payload = bridge_request(
             f"http://127.0.0.1:{server.server_port}/exec",
             exact_key,
-            {},
+            {
+                "key": "replacement-must-not-win",
+                "callback": "jsonpMustNotBeSent",
+                "_": "caller-cache-value",
+            },
             timeout=5,
         )
     finally:
@@ -149,6 +175,7 @@ def test_bridge_request_uses_plain_json_and_never_sends_callback(monkeypatch):
     assert payload["ok"] is True
     assert _BridgeHandler.last_query["key"] == [exact_key]
     assert "callback" not in _BridgeHandler.last_query
+    assert _BridgeHandler.last_query["_"] != ["caller-cache-value"]
 
 
 def test_bridge_request_constructs_draft_action(monkeypatch):
