@@ -1,4 +1,5 @@
 import json
+import os
 import stat
 import threading
 import urllib.parse
@@ -87,8 +88,14 @@ def test_local_config_preserves_key_and_is_private(tmp_path):
     save_config(Store(), {"url": "https://example.invalid", "key": exact_key})
 
     assert load_config(Store())["key"] == exact_key
-    mode = stat.S_IMODE((tmp_path / gmail_bridge.CONFIG_NAME).stat().st_mode)
-    assert mode & 0o077 == 0
+    config_path = tmp_path / gmail_bridge.CONFIG_NAME
+    assert config_path.is_file()
+
+    # POSIX chmod controls group/other permission bits. Windows uses ACLs
+    # instead, and Python's st_mode does not represent those ACLs.
+    if os.name != "nt":
+        mode = stat.S_IMODE(config_path.stat().st_mode)
+        assert mode & 0o077 == 0
 
 
 class _BridgeHandler(BaseHTTPRequestHandler):
