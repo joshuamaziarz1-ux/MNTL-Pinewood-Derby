@@ -20,7 +20,7 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 if errorlevel 1 exit /b 1
 
-python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py gmail_bridge.py qt_bridge.py desktop_fixes.py
+python -m py_compile launcher.py app.py storage.py backup.py race_engine.py migration.py gmail_bridge.py desktop_fixes.py
 if errorlevel 1 exit /b 1
 
 pytest -q
