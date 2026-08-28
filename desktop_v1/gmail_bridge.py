@@ -8,6 +8,7 @@ portable Derby backups.
 from __future__ import annotations
 
 import copy
+import html
 import json
 import re
 import time
@@ -76,7 +77,7 @@ def load_bridge_connection_file(path: str | Path) -> dict[str, str]:
     if not isinstance(data, dict) or data.get("type") != "mnlt-derby-bridge":
         raise ValueError("That is not an MNLT Derby connection file.")
     url = normalize_url(str(data.get("url", "")))
-    key = str(data.get("key", "")).strip()
+    key = str(data.get("key", ""))
     if not url:
         raise ValueError("The connection file does not contain a valid Apps Script Web App URL.")
     if not key:
@@ -98,71 +99,76 @@ def save_config(store, data: dict[str, Any]) -> None:
 
 
 def parse_bridge_payload(text: str, callback: str = "mnltDesktopCallback") -> dict[str, Any]:
-    """Parse Apps Script JSON or JSONP defensively.
-
-    Apps Script can return the same payload with small wrapper differences
-    depending on redirects/content type. The browser executes those wrappers
-    as JavaScript; the desktop app has to unwrap them itself.
-    """
-    text = str(text or "").lstrip("\ufeff").strip()
-    if not text:
+    """Parse Apps Script JSON / JSONP exactly as returned over HTTP."""
+    raw = str(text or "").lstrip("\ufeff").strip()
+    if not raw:
         raise ValueError("The registration bridge returned an empty response.")
+
+    # Google sometimes wraps script/plain text in a tiny HTML page.
+    if raw.startswith("<"):
+        pre = re.search(r"<pre[^>]*>(.*?)</pre>", raw, re.I | re.S)
+        if pre:
+            raw = html.unescape(re.sub(r"<[^>]+>", "", pre.group(1))).strip()
+        else:
+            body = re.search(r"<body[^>]*>(.*?)</body>", raw, re.I | re.S)
+            if body:
+                raw = html.unescape(re.sub(r"<[^>]+>", "", body.group(1))).strip()
 
     # Plain JSON.
     try:
-        data = json.loads(text)
+        data = json.loads(raw)
         if isinstance(data, dict):
             return data
     except Exception:
         pass
 
-    # Common JSONP forms, including a leading JS comment and
-    # "callback && callback({...})".
-    cleaned = re.sub(r"^\s*/\*.*?\*/\s*", "", text, flags=re.S)
-    patterns = [
-        r"^[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
-        r"^[A-Za-z_$][\w$]*\s*&&\s*[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
-        r"^typeof\s+[A-Za-z_$][\w$]*\s*===?\s*['\"]function['\"]\s*&&\s*[A-Za-z_$][\w$]*\s*\((\s*\{.*\}\s*)\)\s*;?\s*$",
-    ]
-    for pattern in patterns:
-        match = re.match(pattern, cleaned, re.S)
-        if match:
-            try:
-                data = json.loads(match.group(1))
-            except Exception:
-                continue
-            if isinstance(data, dict):
-                return data
+    cleaned = re.sub(r"^\s*/\*.*?\*/\s*", "", raw, flags=re.S)
 
-    # Last-resort extraction of the JSON object from a harmless JS wrapper or
-    # XSSI prefix. JSONDecoder.raw_decode avoids greedily swallowing suffix JS.
-    start = cleaned.find("{")
-    if start >= 0:
+    # Standard JSONP: callback({...});
+    match = re.match(r"^[A-Za-z_$][\w$]*\s*\((.*)\)\s*;?\s*$", cleaned, re.S)
+    if match:
         try:
-            data, _end = json.JSONDecoder().raw_decode(cleaned[start:])
+            data = json.loads(match.group(1))
             if isinstance(data, dict):
                 return data
         except Exception:
             pass
 
-    raise ValueError("The registration bridge returned a response format Desktop v1 did not recognize.")
+    # Harmless wrapper / XSSI prefix: decode the first JSON object.
+    first = cleaned.find("{")
+    if first >= 0:
+        try:
+            data, _end = json.JSONDecoder().raw_decode(cleaned[first:])
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
 
+    snippet = re.sub(r"\s+", " ", cleaned)[:180]
+    raise ValueError(
+        "The registration bridge returned a response format Desktop v1 did not recognize."
+        + (f" Response began: {snippet}" if snippet else "")
+    )
 
-def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, timeout: int = 18) -> dict[str, Any]:
-    """Call the public Apps Script bridge without Google-account cookies.
+def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, timeout: int = 25) -> dict[str, Any]:
+    """Call Apps Script with the same GET query used by the working v42 JSONP bridge.
 
-    The browser build only became reliable once the request was made
-    credentialless. A fresh requests.Session gives the desktop app the same
-    anonymous behavior while still following Apps Script redirects.
+    This runs in a background Python thread and does not use Qt URL rewriting,
+    Chrome cookies, or browser storage.
     """
     url = normalize_url(url)
     if not url:
         raise ValueError("Apps Script Web App URL is invalid.")
-    if not str(key or "").strip():
+
+    # Do not alter the saved key other than the emptiness check. The downloaded
+    # v42 connection file is the source of truth.
+    key = str(key or "")
+    if not key:
         raise ValueError("Bridge Key is required.")
-    callback = "__mnltBridge_desktop"
+
+    callback = f"__mnltBridge_{int(time.time() * 1000)}_desktop"
     query: dict[str, Any] = {
-        "key": str(key).strip(),
+        "key": key,
         "callback": callback,
         "_": int(time.time() * 1000),
     }
@@ -178,31 +184,35 @@ def bridge_request(url: str, key: str, params: dict[str, Any] | None = None, tim
             timeout=timeout,
             allow_redirects=True,
             headers={
-                "User-Agent": "Mozilla/5.0 MNLT-Derby-Manager-Desktop-v1",
-                "Accept": "application/json,text/javascript,text/plain,*/*",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    "AppleWebKit/537.36 (KHTML, like Gecko) "
+                    "Chrome/151.0.0.0 Safari/537.36"
+                ),
+                "Accept": "*/*",
                 "Cache-Control": "no-cache",
                 "Pragma": "no-cache",
+                "Referer": "",
             },
         )
     except requests.RequestException as exc:
         raise ConnectionError(f"Could not reach Apps Script ({exc.__class__.__name__}).") from exc
 
-    if response.status_code != 200:
-        raise ConnectionError(f"Apps Script returned HTTP {response.status_code}.")
-
     body = response.text.lstrip("\ufeff").strip()
-    if not body:
-        raise ConnectionError("Apps Script returned an empty response.")
-    if body.startswith("<!DOCTYPE html") or body.startswith("<html"):
-        low = body.casefold()
-        if "sign in" in low or "accounts.google" in low:
-            raise ConnectionError(
-                "Google returned a sign-in page. The Apps Script deployment must allow Anyone access."
-            )
-        raise ConnectionError("Google returned an HTML page instead of bridge data.")
+    low = body.casefold()
+
+    if "accounts.google.com" in low or ("sign in" in low and "google" in low):
+        raise ConnectionError(
+            "Google returned a sign-in page. The Apps Script deployment must allow Anyone access."
+        )
+    if response.status_code != 200:
+        snippet = re.sub(r"\s+", " ", body)[:180]
+        raise ConnectionError(
+            f"Apps Script returned HTTP {response.status_code}."
+            + (f" Response began: {snippet}" if snippet else "")
+        )
 
     return parse_bridge_payload(body, callback)
-
 
 def _division(value: str) -> str:
     value = str(value or "").strip()
@@ -363,7 +373,7 @@ class EmailRegistrationPage(QWidget):
 
     def save_connection(self) -> None:
         url = normalize_url(self.url.text())
-        key = self.key.text().strip()
+        key = self.key.text()
         if not url:
             QMessageBox.warning(self, "Gmail Bridge", "Paste the Apps Script Web App URL ending in /exec.")
             return
@@ -391,7 +401,7 @@ class EmailRegistrationPage(QWidget):
         self.status.setText("Disconnected")
 
     def check_now(self, manual: bool = True) -> None:
-        if self._web_request is not None:
+        if self._future is not None:
             return
         url = normalize_url(self.url.text())
         key = self.key.text().strip()
@@ -404,19 +414,19 @@ class EmailRegistrationPage(QWidget):
         self._start_web_request("check", {}, None)
 
     def _start_web_request(self, kind: str, params: dict[str, Any], context: dict[str, Any] | None) -> None:
+        if self._future is not None:
+            return
         cfg = load_config(self.manager.store)
         url = normalize_url(cfg.get("url", "") or self.url.text())
-        key = str(cfg.get("key", "") or self.key.text()).strip()
+        key = str(cfg.get("key", "") or self.key.text())
         if not url or not key:
             self.check_btn.setEnabled(True)
             self.status.setText("Not set up")
             return
-        request = CredentiallessAppsScriptRequest(url, key, params, self)
-        self._web_request = request
         self._future_kind = kind
         self._draft_context = copy.deepcopy(context) if context else None
-        request.finished.connect(self._web_finished)
-        request.start()
+        self._future = self._executor.submit(bridge_request, url, key, params)
+        self.poll_timer.start()
 
     def _web_finished(self, data: object, error: object) -> None:
         kind = self._future_kind
@@ -619,7 +629,7 @@ class EmailRegistrationPage(QWidget):
         self.refresh_table()
 
     def create_draft_for(self, pending: dict[str, Any], saved: dict[str, Any]) -> None:
-        if self._web_request is not None:
+        if self._future is not None:
             QMessageBox.information(
                 self,
                 "Gmail Draft",
@@ -628,7 +638,7 @@ class EmailRegistrationPage(QWidget):
             return
         cfg = load_config(self.manager.store)
         url = normalize_url(cfg.get("url", ""))
-        key = str(cfg.get("key", "")).strip()
+        key = str(cfg.get("key", ""))
         if not url or not key:
             QMessageBox.information(
                 self,
