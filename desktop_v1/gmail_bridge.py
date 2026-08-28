@@ -24,6 +24,7 @@ from qt_bridge import CredentiallessAppsScriptRequest
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
     QCheckBox,
+    QFileDialog,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -67,6 +68,20 @@ def load_config(store) -> dict[str, Any]:
         "key": str(data.get("key", "")),
         "ignored": [str(x) for x in (data.get("ignored") or [])][-500:],
     }
+
+
+def load_bridge_connection_file(path: str | Path) -> dict[str, str]:
+    file_path = Path(path)
+    data = json.loads(file_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or data.get("type") != "mnlt-derby-bridge":
+        raise ValueError("That is not an MNLT Derby connection file.")
+    url = normalize_url(str(data.get("url", "")))
+    key = str(data.get("key", "")).strip()
+    if not url:
+        raise ValueError("The connection file does not contain a valid Apps Script Web App URL.")
+    if not key:
+        raise ValueError("The connection file does not contain a Bridge Key.")
+    return {"url": url, "key": key}
 
 
 def save_config(store, data: dict[str, Any]) -> None:
@@ -259,10 +274,12 @@ class EmailRegistrationPage(QWidget):
         setup_layout.addWidget(self.key)
 
         buttons = QHBoxLayout()
+        self.import_btn = QPushButton("IMPORT V42 CONNECTION FILE")
         self.save_btn = QPushButton("SAVE CONNECTION")
         self.save_btn.setObjectName("primary")
         self.check_btn = QPushButton("CHECK NOW")
         self.disconnect_btn = QPushButton("DISCONNECT")
+        buttons.addWidget(self.import_btn)
         buttons.addWidget(self.save_btn)
         buttons.addWidget(self.check_btn)
         buttons.addWidget(self.disconnect_btn)
@@ -291,6 +308,7 @@ class EmailRegistrationPage(QWidget):
         list_layout.addLayout(actions)
         layout.addWidget(list_box, 1)
 
+        self.import_btn.clicked.connect(self.import_connection_file)
         self.save_btn.clicked.connect(self.save_connection)
         self.check_btn.clicked.connect(lambda: self.check_now(True))
         self.disconnect_btn.clicked.connect(self.disconnect)
@@ -318,6 +336,30 @@ class EmailRegistrationPage(QWidget):
         self.url.setText(cfg.get("url", ""))
         self.key.setText(cfg.get("key", ""))
         self.status.setText("Ready" if self.connection_ready() else "Not set up")
+
+    def import_connection_file(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self,
+            "Import v42 Gmail Connection",
+            "",
+            "MNLT Derby Connection (*.mnltbridge);;JSON Files (*.json);;All Files (*.*)",
+        )
+        if not path:
+            return
+        try:
+            imported = load_bridge_connection_file(path)
+        except Exception as exc:
+            QMessageBox.warning(self, "Gmail Bridge", str(exc))
+            return
+
+        cfg = load_config(self.manager.store)
+        cfg.update(imported)
+        save_config(self.manager.store, cfg)
+        self.url.setText(imported["url"])
+        self.key.setText(imported["key"])
+        self.status.setText("v42 connection imported. Checking Gmail registration bridge…")
+        self.auto_timer.start()
+        self.check_now(True)
 
     def save_connection(self) -> None:
         url = normalize_url(self.url.text())
