@@ -62,3 +62,52 @@ def test_load_bridge_connection_file(tmp_path):
     cfg = load_bridge_connection_file(path)
     assert cfg["url"].endswith("/exec")
     assert cfg["key"] == "secret-key"
+
+
+def test_bridge_request_matches_v42_get_through_redirect():
+    import json
+    import threading
+    import urllib.parse
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+    from gmail_bridge import bridge_request
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            parsed = urllib.parse.urlsplit(self.path)
+            if parsed.path == "/exec":
+                self.send_response(302)
+                self.send_header("Location", "/payload?" + parsed.query)
+                self.end_headers()
+                return
+            q = urllib.parse.parse_qs(parsed.query, keep_blank_values=True)
+            key = q.get("key", [""])[0]
+            callback = q.get("callback", ["cb"])[0]
+            payload = {
+                "ok": key == "v42-key+with/special=chars",
+                "registrations": [{"messageId": "m1", "name": "Redirect Racer"}],
+            }
+            body = f"{callback}({json.dumps(payload)});".encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        payload = bridge_request(
+            f"http://127.0.0.1:{server.server_port}/exec",
+            "v42-key+with/special=chars",
+            {},
+            timeout=5,
+        )
+        assert payload["ok"] is True
+        assert payload["registrations"][0]["name"] == "Redirect Racer"
+    finally:
+        server.shutdown()
+        server.server_close()
