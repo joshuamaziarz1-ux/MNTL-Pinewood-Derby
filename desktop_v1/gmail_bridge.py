@@ -13,14 +13,11 @@ import json
 import re
 import time
 import urllib.parse
-import urllib.request
 
 import requests
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any
-
-from qt_bridge import CredentiallessAppsScriptRequest
 
 from PySide6.QtCore import QTimer, Qt
 from PySide6.QtWidgets import (
@@ -49,7 +46,20 @@ def normalize_url(value: str) -> str:
         return ""
     if not re.search(r"/exec(?:[?#]|$)", value, re.I):
         return ""
-    return value.split("#", 1)[0]
+
+    # Google adds ``authuser`` when an Apps Script URL is copied while more
+    # than one Google account is signed in.  That parameter selects a browser
+    # account before the public Web App is run.  It is not part of the Web App
+    # endpoint and sends a cookie-free desktop client through Google's account
+    # chooser instead of to ContentService.  v42 deliberately removes it in
+    # v36-credentialless.js; Desktop must canonicalize the endpoint the same
+    # way rather than faithfully replaying browser-only account routing.
+    parts = urllib.parse.urlsplit(value)
+    query = urllib.parse.parse_qsl(parts.query, keep_blank_values=True)
+    query = [(name, item) for name, item in query if name.casefold() != "authuser"]
+    return urllib.parse.urlunsplit(
+        (parts.scheme, parts.netloc, parts.path, urllib.parse.urlencode(query), "")
+    )
 
 
 def _config_path(store) -> Path:
