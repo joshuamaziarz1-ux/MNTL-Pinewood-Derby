@@ -127,9 +127,11 @@ class _BridgeHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
         else:
-            body = json.dumps(type(self).response_payload).encode("utf-8")
+            callback = type(self).last_query.get("callback", [""])[0]
+            payload = json.dumps(type(self).response_payload)
+            body = f"{callback}({payload});".encode("utf-8")
             self.send_response(200)
-            self.send_header("Content-Type", "application/json; charset=utf-8")
+            self.send_header("Content-Type", "text/javascript; charset=utf-8")
 
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -152,7 +154,7 @@ def _run_server():
     return server
 
 
-def test_bridge_request_uses_plain_json_and_never_sends_callback(monkeypatch):
+def test_bridge_request_matches_v42_jsonp_and_protects_callback(monkeypatch):
     server = _run_server()
     monkeypatch.setattr(gmail_bridge, "normalize_url", lambda value: str(value))
     exact_key = "v42-key+with/special=chars=="
@@ -174,7 +176,8 @@ def test_bridge_request_uses_plain_json_and_never_sends_callback(monkeypatch):
 
     assert payload["ok"] is True
     assert _BridgeHandler.last_query["key"] == [exact_key]
-    assert "callback" not in _BridgeHandler.last_query
+    assert _BridgeHandler.last_query["callback"] == [gmail_bridge.DESKTOP_CALLBACK]
+    assert _BridgeHandler.last_query["callback"] != ["jsonpMustNotBeSent"]
     assert _BridgeHandler.last_query["_"] != ["caller-cache-value"]
 
 
@@ -206,7 +209,7 @@ def test_bridge_request_constructs_draft_action(monkeypatch):
     assert _BridgeHandler.last_query["division"] == ["Both"]
     assert _BridgeHandler.last_query["tradCar"] == ["Red Rocket"]
     assert _BridgeHandler.last_query["modCar"] == ["Wild Thing"]
-    assert "callback" not in _BridgeHandler.last_query
+    assert _BridgeHandler.last_query["callback"] == [gmail_bridge.DESKTOP_CALLBACK]
 
 
 def test_bridge_error_diagnostics_do_not_echo_private_response(monkeypatch):
@@ -227,7 +230,7 @@ def test_bridge_error_diagnostics_do_not_echo_private_response(monkeypatch):
         server.server_close()
 
     message = str(exc.value)
-    assert "plain JSON" in message
+    assert "expected v42 callback response" in message
     assert "text/html" in message
     assert "PRIVATE_RACER_NAME" not in message
     assert "PRIVATE_EMAIL" not in message

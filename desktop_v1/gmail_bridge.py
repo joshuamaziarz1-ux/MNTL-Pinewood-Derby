@@ -1,11 +1,12 @@
 """Clean Gmail / SnapPages registration bridge for MNLT Derby Manager Desktop v1.
 
 Desktop v1 intentionally uses one transport only:
-    requests GET -> Apps Script /exec -> plain JSON
+    requests GET -> Apps Script /exec -> JSONP
 
-The working browser v42 uses JSONP because browsers need a script callback. Desktop
-Python does not. The Apps Script bridge already returns plain JSON whenever the
-callback query parameter is omitted, so Desktop v1 avoids JSONP completely.
+The live Apps Script deployment currently returns JavaScript to the same callback
+request used by working browser v42. Desktop mirrors that request and parses only
+the exact callback wrapper it asked for. No browser, Qt, iframe, or fallback
+transport is involved.
 
 Bridge credentials are stored locally beside the Desktop data and are never written
 into Derby portable backups or GitHub.
@@ -44,6 +45,7 @@ from PySide6.QtWidgets import (
 CONFIG_NAME = "bridge_config.json"
 CHECK_INTERVAL_MS = 60 * 60 * 1000
 BRIDGE_TIMEOUT_SECONDS = 25
+DESKTOP_CALLBACK = "__mnltDesktopBridge"
 RUNTIME_QUERY_NAMES = {
     "authuser",
     "key",
@@ -182,17 +184,35 @@ def _response_classification(response: requests.Response) -> str:
     )
 
 
+def _parse_jsonp(body: str, callback: str) -> dict[str, Any]:
+    """Parse only the exact callback wrapper requested by Desktop v1."""
+
+    text = str(body or "").strip()
+    prefix = callback + "("
+    if not text.startswith(prefix):
+        raise ValueError("callback prefix did not match")
+
+    inner = text[len(prefix):]
+    if inner.endswith(");"):
+        inner = inner[:-2]
+    elif inner.endswith(")"):
+        inner = inner[:-1]
+    else:
+        raise ValueError("callback suffix did not match")
+
+    data = json.loads(inner)
+    if not isinstance(data, dict):
+        raise ValueError("callback payload was not an object")
+    return data
+
+
 def bridge_request(
     url: str,
     key: str,
     params: dict[str, Any] | None = None,
     timeout: int = BRIDGE_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
-    """Call Apps Script and return its plain JSON payload.
-
-    Desktop intentionally does NOT send callback. The Apps Script doGet() in
-    MNLT_Registration_Bridge.gs returns application/json when callback is absent.
-    """
+    """Call the live Apps Script bridge using the same JSONP semantics as v42."""
 
     clean_url = normalize_url(url)
     if not clean_url:
@@ -204,13 +224,13 @@ def bridge_request(
 
     query: dict[str, str] = {
         "key": key,
+        "callback": DESKTOP_CALLBACK,
         "_": str(int(time.time() * 1000)),
     }
     for name, value in (params or {}).items():
         normalized_name = str(name)
         # Authentication, cache busting, and response format are owned by this
-        # transport.  In particular, no caller can accidentally turn the
-        # Desktop request into JSONP or replace the exact imported key.
+        # transport. Callers cannot replace the imported key or callback.
         if normalized_name.casefold() in {"key", "callback", "_"}:
             continue
         query[normalized_name] = "" if value is None else str(value)
@@ -226,7 +246,7 @@ def bridge_request(
             allow_redirects=True,
             headers={
                 "User-Agent": "MNLT-Derby-Manager-Desktop-v1",
-                "Accept": "application/json,text/plain;q=0.9,*/*;q=0.5",
+                "Accept": "text/javascript,application/javascript,*/*;q=0.5",
                 "Cache-Control": "no-cache",
                 "Pragma": "no-cache",
             },
@@ -250,17 +270,12 @@ def bridge_request(
         raise BridgeError(f"Apps Script request failed. {diagnostic}.")
 
     try:
-        data = response.json()
-    except ValueError as exc:
+        return _parse_jsonp(body, DESKTOP_CALLBACK)
+    except (ValueError, json.JSONDecodeError) as exc:
         raise BridgeError(
-            "Apps Script did not return plain JSON. "
-            f"{diagnostic}. Desktop v1 uses the JSON endpoint only."
+            "Apps Script did not return the expected v42 callback response. "
+            f"{diagnostic}."
         ) from exc
-
-    if not isinstance(data, dict):
-        raise BridgeError(f"Apps Script returned an invalid JSON payload. {diagnostic}.")
-
-    return data
 
 
 def _division(value: str) -> str:
