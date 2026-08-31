@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Connection Update</title>
+<style>
+body{margin:0;background:#0b1a2a;color:#fff;font-family:Arial,sans-serif}.wrap{max-width:760px;margin:50px auto;padding:24px}
+.card{background:#13283e;border:1px solid #35516c;border-radius:14px;padding:24px}h1{margin:0 0 8px;font-size:30px}
+p{color:#b8c7d7;line-height:1.5}label{display:block;font-weight:800;margin-top:18px}
+input{width:100%;box-sizing:border-box;padding:13px;border-radius:9px;border:1px solid #4a6682;background:#0d1b2b;color:#fff;font-size:14px;margin-top:7px}
+button{width:100%;border:0;border-radius:9px;padding:15px 18px;font-size:17px;font-weight:800;cursor:pointer;background:#d8a63d;color:#111820;margin-top:18px}
+.status{margin:16px 0;padding:12px;border-radius:9px;background:#173c29;color:#a8efbc;font-weight:700}.status.bad{background:#3a2025;color:#ffb0b7}
+.small{font-size:13px;color:#93a8bc;margin-top:12px}.step{background:#0e2033;border-radius:8px;padding:10px 12px;margin:8px 0;color:#c9d6e3}
+</style>
+</head><body><div class="wrap"><div class="card">
+<h1>MNLT Derby Gmail Connection</h1>
+<p>Paste the current Web App URL and the new Bridge Key from Apps Script. This replaces any old saved connection.</p>
+<div class="step"><b>1.</b> In Apps Script, click <b>Copy</b> under <b>Web app → URL</b>.</div>
+<div class="step"><b>2.</b> Paste that URL below.</div>
+<div class="step"><b>3.</b> Paste the long Bridge Key from the execution log.</div>
+<label>Web App URL</label><input id="url" placeholder="https://script.google.com/macros/s/.../exec">
+<label>Bridge Key</label><input id="key" autocomplete="off" spellcheck="false" placeholder="Paste the long bridge key">
+<button id="save">SAVE CONNECTION</button>
+<div id="status" class="status">Waiting for the current URL and key.</div>
+<div class="small">After saving, return to Registration v5, refresh, and test the draft button again.</div>
+</div></div>
+<script>
+const CFG='mnltDerbyRegistrationBridgeV1',u=document.getElementById('url'),k=document.getElementById('key'),s=document.getElementById('status');
+try{const old=JSON.parse(localStorage.getItem(CFG)||'null');if(old&&old.url)u.value=old.url}catch(e){}
+document.getElementById('save').onclick=()=>{
+ const url=u.value.trim(),key=k.value.trim();
+ if(!/^https:\/\/script\.google\.com\/macros\/s\/.+\/exec(?:\?.*)?$/.test(url)){alert('That does not look like the Web app URL. Use the Copy button under Web app → URL.');return}
+ if(key.length<40){alert('That bridge key looks too short. Paste the full long key from the execution log.');return}
+ localStorage.setItem(CFG,JSON.stringify({url,key}));
+ s.textContent='CONNECTION SAVED. Return to Registration v5 and refresh.';
+ s.classList.remove('bad');
+};
+</script></body></html>
