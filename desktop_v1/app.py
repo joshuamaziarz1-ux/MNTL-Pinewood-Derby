@@ -678,7 +678,7 @@ class BackupPage(QWidget):
         super().__init__();self.manager=manager;lay=QVBoxLayout(self);title=QLabel("Backup & Recovery");f=QFont();f.setPointSize(22);f.setBold(True);title.setFont(f);lay.addWidget(title)
         self.status=QLabel();self.status.setWordWrap(True);lay.addWidget(self.status)
         save=QPushButton("CREATE FULL PORTABLE BACKUP");save.setObjectName("primary");save.clicked.connect(self.create);restore=QPushButton("RESTORE FULL BACKUP");restore.clicked.connect(self.restore);folder=QPushButton("SHOW DATA LOCATION");folder.clicked.connect(self.show_location);lay.addWidget(save);lay.addWidget(restore);lay.addWidget(folder);self.location=QLabel();self.location.setTextInteractionFlags(Qt.TextSelectableByMouse);lay.addWidget(self.location);lay.addStretch();self.refresh()
-    def refresh(self)->None:self.status.setText("Every change is written to SQLite immediately. Backups contain derby.db plus all car photo files and SHA-256 integrity checks.");self.location.setText(f"Data: {self.manager.store.data_dir}\nDatabase: {self.manager.store.db_path}\nPhotos: {self.manager.store.photos_dir}\nBackups: {self.manager.store.backups_dir}")
+    def refresh(self)->None:self.status.setText("Autosave and backup protection are active.");self.location.setText(f"Data: {self.manager.store.data_dir}\nDatabase: {self.manager.store.db_path}\nPhotos: {self.manager.store.photos_dir}\nBackups: {self.manager.store.backups_dir}")
     def create(self)->None:
         path,_=QFileDialog.getSaveFileName(self,"Save Full Derby Backup",str(self.manager.store.backups_dir/"MNLT_Derby_Backup.zip"),"ZIP Backup (*.zip)")
         if not path:return
@@ -699,7 +699,7 @@ class BackupPage(QWidget):
 class MainWindow(QMainWindow):
     def __init__(self)->None:
         super().__init__();self.setWindowTitle(f"MNLT Derby Manager • {APP_VERSION}");self.resize(1400,900);self.store=DerbyStore();self.state=ensure_state(self.store.load_state());self.current_division="Traditional";self.projector:ProjectorWindow|None=None
-        root=QWidget();outer=QVBoxLayout(root);header=QHBoxLayout();brand=QLabel("MNLT DERBY MANAGER");f=QFont();f.setPointSize(20);f.setBold(True);brand.setFont(f);header.addWidget(brand);header.addStretch();self.save_label=QLabel("SQLite autosave ready");header.addWidget(self.save_label);outer.addLayout(header)
+        root=QWidget();outer=QVBoxLayout(root);header=QHBoxLayout();brand=QLabel("MNLT DERBY MANAGER");f=QFont();f.setPointSize(20);f.setBold(True);brand.setFont(f);header.addWidget(brand);header.addStretch();self.save_label=QLabel("Autosave Ready");header.addWidget(self.save_label);outer.addLayout(header)
         body=QHBoxLayout();nav=QVBoxLayout();self.stack=QStackedWidget();body.addLayout(nav,0);body.addWidget(self.stack,1);outer.addLayout(body,1);self.setCentralWidget(root)
         self.registration=RegistrationPage(self);self.traditional=DivisionRacePage(self,"Traditional");self.modified=DivisionRacePage(self,"Modified");self.backup=BackupPage(self)
         self.home=self._home_page();self.stack.addWidget(self.home);self.stack.addWidget(self.registration);self.stack.addWidget(self.traditional);self.stack.addWidget(self.modified);self.stack.addWidget(self.backup)
@@ -708,10 +708,10 @@ class MainWindow(QMainWindow):
         projector=QPushButton("Open Projector");projector.setMinimumHeight(48);projector.clicked.connect(self.show_projector);nav.addWidget(projector);nav.addStretch();self.setStyleSheet(self._style());self.registration.changed.connect(self.refresh_all);QTimer.singleShot(1000,self._startup_backup)
     def _style(self)->str:return """QMainWindow,QWidget{background:#0b1522;color:#f4f7fb;font-family:Arial;}QGroupBox{border:1px solid #30465f;border-radius:10px;margin-top:10px;padding:12px;font-weight:bold;}QLineEdit,QComboBox,QSpinBox,QTextEdit,QTableWidget{background:#0e1c2c;border:1px solid #41566e;border-radius:6px;padding:6px;color:white;}QHeaderView::section{background:#13243a;color:#9dafc1;padding:7px;border:0;}QPushButton{background:#2a405a;color:white;border:0;border-radius:8px;padding:10px;font-weight:bold;}QPushButton:hover{background:#385472;}QPushButton#primary{background:#d8a63d;color:#111820;}QTabBar::tab{background:#13243a;color:#c7d3df;padding:11px 16px;}QTabBar::tab:selected{background:#d8a63d;color:#111820;font-weight:bold;}"""
     def _home_page(self)->QWidget:
-        w=QWidget();lay=QVBoxLayout(w);lay.addStretch();title=QLabel("MNLT Pinewood Derby");f=QFont();f.setPointSize(34);f.setBold(True);title.setFont(f);title.setAlignment(Qt.AlignCenter);lay.addWidget(title);sub=QLabel("Desktop Race Manager • No browser required");sub.setAlignment(Qt.AlignCenter);lay.addWidget(sub);lay.addStretch();return w
+        w=QWidget();lay=QVBoxLayout(w);lay.addStretch();title=QLabel("MNLT Pinewood Derby");f=QFont();f.setPointSize(34);f.setBold(True);title.setFont(f);title.setAlignment(Qt.AlignCenter);lay.addWidget(title);sub=QLabel("Race Day Control");sub.setAlignment(Qt.AlignCenter);lay.addWidget(sub);lay.addStretch();return w
     def open_page(self,page:QWidget)->None:self.stack.setCurrentWidget(page);self.refresh_all()
     def save(self,reason:str,snapshot:bool=True)->None:
-        self.store.save_state(self.state,reason=reason,snapshot=snapshot);self.state=ensure_state(self.store.load_state());self.save_label.setText("✓ Saved to SQLite");QTimer.singleShot(1800,lambda:self.save_label.setText("SQLite autosave ready"));self.refresh_projector()
+        self.store.save_state(self.state,reason=reason,snapshot=snapshot);self.state=ensure_state(self.store.load_state());self.save_label.setText("✓ Saved");QTimer.singleShot(1800,lambda:self.save_label.setText("Autosave Ready"));self.refresh_projector()
     def refresh_all(self)->None:
         self.registration.refresh();self.traditional.refresh();self.modified.refresh();self.backup.refresh()
     def show_projector(self)->None:
@@ -725,8 +725,8 @@ class MainWindow(QMainWindow):
     def project_saved_heat(self,division:str,saved_heat:dict[str,Any],next_heat:dict[str,Any]|None,total:int,runoff:dict[str,Any]|None)->None:
         if self.projector and self.projector.isVisible():self.projector.show_saved_heat_sequence(division,saved_heat,next_heat,total,runoff)
     def _startup_backup(self)->None:
-        try:create_full_backup(self.store);from backup import prune_backups;prune_backups(self.store.backups_dir,30);self.save_label.setText("✓ Autosave + startup backup ready")
-        except Exception:self.save_label.setText("SQLite autosave ready • make a portable backup soon")
+        try:create_full_backup(self.store);from backup import prune_backups;prune_backups(self.store.backups_dir,30);self.save_label.setText("✓ Autosave Ready")
+        except Exception:self.save_label.setText("Autosave Ready")
     def closeEvent(self,event)->None:
         try:self.store.save_state(self.state,reason="application-close",snapshot=True);create_full_backup(self.store);self.store.close()
         except Exception:pass
