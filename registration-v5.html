@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MNLT Derby Registration Manager v5</title>
+<style>
+*{box-sizing:border-box}body{margin:0;font-family:Arial,sans-serif;background:#0b1522;color:#f4f7fb}button,input,select,textarea{font:inherit}
+header{background:#13243a;border-bottom:3px solid #d8a63d;padding:16px 22px}.brand{font-size:27px;font-weight:900}.sub,.muted{color:#aab9c8}
+.wrap{max-width:1400px;margin:auto;padding:18px}.panel{background:#142338;border:1px solid #2d435d;border-radius:12px;padding:18px;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:1fr 1.2fr;gap:16px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.btn{border:0;border-radius:9px;cursor:pointer;font-weight:800;padding:12px 16px;background:#2a405a;color:#fff}.btn.primary{background:#d8a63d;color:#111820}.btn.good{background:#316b46}.btn.danger{background:#8d3541}.btn.gmail{background:#fff;color:#1f1f1f;border:1px solid #dadce0}.btn:disabled{opacity:.55;cursor:not-allowed}
+label{display:block;font-weight:800;margin-top:8px}input,select,textarea{width:100%;padding:12px;margin:6px 0 10px;border-radius:8px;border:1px solid #41566e;background:#0d1b2b;color:#fff}
+textarea{min-height:230px;resize:vertical;line-height:1.45}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.check{display:flex;gap:8px;align-items:center;background:#0e1c2c;border:1px solid #30465f;border-radius:8px;padding:10px 12px;margin:6px 6px 6px 0}.check input{width:auto;margin:0}
+.status,.sendbox,.note{padding:12px;border-radius:8px;background:#0e1c2c;border:1px solid #30465f;margin-top:10px}.note{border-left:4px solid #d8a63d}.sendbox{border:2px solid #405873}
+.ok{color:#8bd39d;font-weight:800}.warn{color:#ffcf72;font-weight:800}.bad{color:#ff9aa4;font-weight:800}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;text-align:left;border-bottom:1px solid #31465f;vertical-align:top}th{color:#c7d2df}
+.pill{display:inline-block;padding:4px 8px;border-radius:999px;background:#243b56;margin:2px;font-size:12px}.small{font-size:12px}.toolbar{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+.version{position:fixed;left:8px;bottom:5px;color:#778a9d;font-size:12px}.bigAction{width:100%;padding:17px;font-size:18px;margin-top:8px}
+@media(max-width:950px){.grid,.grid3{grid-template-columns:1fr}}@media(max-width:600px){.wrap{padding:10px}.row .btn{flex:1 1 45%}table{font-size:13px}}
+</style></head><body>
+<header><div class="brand">MNLT DERBY REGISTRATION MANAGER</div><div class="sub">Manual Entry • Automatic Gmail Draft + Rules PDF • Racer List Export</div></header>
+<main class="wrap"><div class="grid"><section>
+<div class="panel"><h2>New Registration</h2>
+<div class="note"><b>Paste name + email → pick division → create draft.</b><br><span class="muted small">No inbox scanning. Nothing happens until you press the draft button.</span></div>
+<label>Racer Name</label><input id="racerName" placeholder="Paste racer name">
+<label>Parent / Contact Email</label><input id="email" type="email" placeholder="Paste email address">
+<label>Division</label><select id="division"><option>Traditional</option><option>Modified</option><option>Both</option></select>
+<div class="grid3"><div><label>Traditional Car Name</label><input id="tradCar" placeholder="Optional / waiting"></div><div><label>Modified Car Name</label><input id="modCar" placeholder="Optional / waiting"></div><div><label>Date Registered</label><input id="regDate" type="date"></div></div>
+<label>Rules PDFs</label><div class="row"><label class="check"><input type="checkbox" id="tradPdf"> Traditional Rules PDF</label><label class="check"><input type="checkbox" id="modPdf"> Modified Rules PDF</label></div>
+<div class="status" id="attachStatus"></div>
+<div class="row" style="margin-top:14px"><button class="btn primary" id="saveBtn">Save Racer</button><button class="btn" id="clearBtn">Next Racer / Clear</button></div>
+</div>
+
+<div class="panel"><h2>Email Draft</h2>
+<label>Email Type</label><select id="emailType"><option value="registration">New Registration</option><option value="carname">Car Name Reminder</option></select>
+<label>Subject</label><input id="subject"><label>Message</label><textarea id="message"></textarea>
+<div id="bridgeStatus" class="status">Checking saved Gmail draft connection…</div>
+<button class="btn gmail bigAction" id="draftBtn">CREATE GMAIL DRAFT + ATTACH PDF</button>
+<div class="row" style="margin-top:10px"><button class="btn" id="copyBtn">Copy Email</button><button class="btn good" id="markSentBtn">Mark Sent</button></div>
+</div></section>
+
+<section><div class="panel"><div class="toolbar"><div><h2 style="margin-bottom:4px">Racer List</h2><div class="muted" id="count"></div></div><div class="row"><button class="btn" id="exportJson">Export for Derby Manager</button><button class="btn" id="exportCsv">Export CSV</button></div></div>
+<div style="overflow:auto"><table><thead><tr><th>Racer</th><th>Division</th><th>Car Name(s)</th><th>Email</th><th>Status</th><th></th></tr></thead><tbody id="list"></tbody></table></div></div>
+<div class="panel"><h3>What v5 does</h3><p class="muted">Traditional automatically attaches the Traditional Rules PDF. Modified attaches the Modified Rules PDF. Both attaches both. The Gmail bridge only creates the draft you request; it does not search or read your inbox.</p></div>
+</section></div></main><div class="version">Registration v5</div>
+<script>
+'use strict';const $=id=>document.getElementById(id),KEY='mnltRegistrationV1',CFG='mnltDerbyRegistrationBridgeV1';let racers=[];try{racers=JSON.parse(localStorage.getItem(KEY)||'[]')}catch(e){racers=[]}let editingId=null;
+function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}
+function today(){return new Date().toISOString().slice(0,10)}$('regDate').value=today();
+function getCfg(){try{return JSON.parse(localStorage.getItem(CFG)||'null')}catch(e){return null}}
+function showBridge(){const c=getCfg();const el=$('bridgeStatus');if(c&&c.url&&c.key){el.innerHTML='<span class="ok">GMAIL DRAFT CONNECTION READY</span> — automatic PDF attachments enabled.'}else{el.innerHTML='<span class="warn">GMAIL DRAFT CONNECTION NEEDS UPDATED SETUP</span> — use the new Draft Bridge v2 once, then this button will create drafts with attachments.'}}
+function syncPdfDefaults(){const d=$('division').value;$('tradPdf').checked=d==='Traditional'||d==='Both';$('modPdf').checked=d==='Modified'||d==='Both';updateAttachments();buildEmail()}
+function updateAttachments(){const a=[];if($('tradPdf').checked)a.push('MNLT_Traditional_Division_Rules.pdf');if($('modPdf').checked)a.push('MNLT_Modified_Division_Rules.pdf');$('attachStatus').innerHTML=a.length?'<span class="ok">WILL ATTACH:</span> '+a.map(esc).join(' + '):'<span class="warn">NO RULES PDF SELECTED</span>'}
+function carInstruction(d){return d==='Both'?'Each derby car needs a name. Please reply to this email with the name of the Traditional car and the name of the Modified car.':'One more thing — every derby car needs a name! Please reply to this email with the name of the car. The car name will be used as part of the race-day presentation and racer information.'}
+function registrationText(name,d){const n=name||'[RACER NAME]',both=d==='Both',div=both?'both the Traditional Division and the Modified Division':`the ${d} Division`,docs=both?'Attached are the official MNLT Pinewood Derby Rules & Regulations for both divisions. Please review both documents carefully so everything is ready for inspection and race day.':`Attached is the official MNLT Pinewood Derby ${d} Division Rules & Regulations. Please review the document carefully so everything is ready for inspection and race day.`;return `Hi!
+
+Thank you for registering ${n} for the MNLT Pinewood Derby!
+
+We’re excited to have ${n} join us in ${div}.
+
+The registration has been received, and ${n} is officially on our list of racers${both?' for both races':''}. We’re looking forward to seeing what gets built and watching it take to the track!
+
+${docs}
+
+${carInstruction(d)}
+
+We’re glad to have ${n} participating, and we can’t wait to see the ${both?'cars':'car'} at the starting line!
+
+MNLT Derby Team`}
+function reminderText(name,d){return `Hi!
+
+We have one more fun detail to add to this year’s MNLT Pinewood Derby!
+
+${carInstruction(d)}
+
+Please reply to this email with:
+
+Racer Name: ${name||'[RACER NAME]'}
+${d==='Both'?'Traditional Car Name:\nModified Car Name:':'Car Name:'}
+
+Thank you!
+
+MNLT Derby Team`}
+function buildEmail(){const n=$('racerName').value.trim(),d=$('division').value,t=$('emailType').value;$('subject').value=t==='registration'?`MNLT Pinewood Derby Registration – ${d==='Both'?'Traditional & Modified Divisions':d+' Division'}`:'MNLT Pinewood Derby – Name Your Car';$('message').value=t==='registration'?registrationText(n,d):reminderText(n,d)}
+['racerName','division','emailType'].forEach(id=>$(id).addEventListener(id==='racerName'?'input':'change',()=>{if(id==='division')syncPdfDefaults();else buildEmail()}));$('tradPdf').onchange=updateAttachments;$('modPdf').onchange=updateAttachments;
+function persist(){localStorage.setItem(KEY,JSON.stringify(racers));render()}
+function currentRecord(){return{id:editingId||Date.now()+Math.floor(Math.random()*100000),name:$('racerName').value.trim(),email:$('email').value.trim(),division:$('division').value,traditionalCar:$('tradCar').value.trim(),modifiedCar:$('modCar').value.trim(),registered:$('regDate').value||today(),traditionalRules:$('tradPdf').checked,modifiedRules:$('modPdf').checked,registrationSent:false,lastEmailSent:'',updatedAt:Date.now()}}
+function saveRacer(silent=false){const r=currentRecord();if(!r.name){if(!silent)alert('Enter the racer name first.');return false}if(!r.email){if(!silent)alert('Enter the contact email.');return false}if(editingId){const old=racers.find(x=>x.id===editingId);if(old){r.registrationSent=old.registrationSent;r.lastEmailSent=old.lastEmailSent}racers=racers.map(x=>x.id===editingId?r:x)}else racers.push(r);persist();editingId=r.id;if(!silent)alert('Racer saved.');return true}
+function clearForm(){editingId=null;$('racerName').value='';$('email').value='';$('division').value='Traditional';$('tradCar').value='';$('modCar').value='';$('regDate').value=today();$('emailType').value='registration';syncPdfDefaults();$('racerName').focus()}
+function editRacer(id){const r=racers.find(x=>x.id===id);if(!r)return;editingId=id;$('racerName').value=r.name;$('email').value=r.email;$('division').value=r.division;$('tradCar').value=r.traditionalCar||'';$('modCar').value=r.modifiedCar||'';$('regDate').value=r.registered||today();$('tradPdf').checked=!!r.traditionalRules;$('modPdf').checked=!!r.modifiedRules;updateAttachments();buildEmail();scrollTo({top:0,behavior:'smooth'})}
+function delRacer(id){const r=racers.find(x=>x.id===id);if(!r||!confirm(`Delete ${r.name} from the registration list?`))return;racers=racers.filter(x=>x.id!==id);if(editingId===id)clearForm();persist()}
+function markSent(){if(!editingId)return alert('Save the racer first.');const r=racers.find(x=>x.id===editingId);if(!r)return;if($('emailType').value==='registration')r.registrationSent=true;r.lastEmailSent=$('emailType').value==='registration'?'Registration':'Car Name Reminder';r.updatedAt=Date.now();persist();alert('Marked sent.')}
+function render(){const tb=$('list');tb.innerHTML='';$('count').textContent=`${racers.length} racer${racers.length===1?'':'s'} saved`;racers.slice().sort((a,b)=>a.name.localeCompare(b.name)).forEach(r=>{const tr=document.createElement('tr'),cars=[];if(r.traditionalCar)cars.push('Traditional: '+r.traditionalCar);if(r.modifiedCar)cars.push('Modified: '+r.modifiedCar);if(!cars.length)cars.push('Waiting for car name');const pdfs=[];if(r.traditionalRules)pdfs.push('Trad PDF');if(r.modifiedRules)pdfs.push('Mod PDF');tr.innerHTML=`<td><b>${esc(r.name)}</b><div class="small muted">${esc(r.registered||'')}</div></td><td>${esc(r.division)}</td><td>${cars.map(esc).join('<br>')}</td><td>${esc(r.email||'')}</td><td>${r.registrationSent?'<span class="ok">Registration sent</span>':'<span class="warn">Not marked sent</span>'}<div>${pdfs.map(x=>`<span class="pill">${x}</span>`).join('')}</div></td><td><button class="btn small" onclick="editRacer(${r.id})">Edit</button> <button class="btn danger small" onclick="delRacer(${r.id})">Delete</button></td>`;tb.appendChild(tr)})}
+function download(name,text,type){const b=new Blob([text],{type}),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),1000)}
+function exportManager(){const out=[];racers.forEach((r,i)=>{if(r.division==='Traditional'||r.division==='Both')out.push({id:Date.now()+i*10+1,name:r.name,car:r.traditionalCar||'',division:'Traditional',email:r.email||''});if(r.division==='Modified'||r.division==='Both')out.push({id:Date.now()+i*10+2,name:r.name,car:r.modifiedCar||'',division:'Modified',email:r.email||''})});download('MNLT_Derby_Racers.json',JSON.stringify(out,null,2),'application/json')}
+function exportCsv(){const q=s=>'"'+String(s??'').replaceAll('"','""')+'"',rows=[['Racer Name','Email','Division','Traditional Car','Modified Car','Registered','Registration Sent','Traditional Rules','Modified Rules'],...racers.map(r=>[r.name,r.email,r.division,r.traditionalCar,r.modifiedCar,r.registered,r.registrationSent?'Yes':'No',r.traditionalRules?'Yes':'No',r.modifiedRules?'Yes':'No'])];download('MNLT_Registration_List.csv',rows.map(r=>r.map(q).join(',')).join('\n'),'text/csv')}
+function jsonp(url){return new Promise((resolve,reject)=>{const cb='mnltDraft_'+Date.now()+'_'+Math.floor(Math.random()*99999),s=document.createElement('script'),timer=setTimeout(()=>{cleanup();reject(new Error('Draft bridge timed out.'))},20000);function cleanup(){clearTimeout(timer);delete window[cb];s.remove()}window[cb]=d=>{cleanup();resolve(d)};s.onerror=()=>{cleanup();reject(new Error('Could not reach the Gmail draft bridge.'))};s.src=url+(url.includes('?')?'&':'?')+'callback='+encodeURIComponent(cb);document.body.appendChild(s)})}
+async function createDraft(){const to=$('email').value.trim(),name=$('racerName').value.trim(),cfg=getCfg();if(!name)return alert('Paste the racer name first.');if(!to)return alert('Paste the email first.');if(!cfg||!cfg.url||!cfg.key)return alert('The Gmail Draft Bridge v2 needs to be installed once first.');saveRacer(true);const b=$('draftBtn');b.disabled=true;b.textContent='CREATING DRAFT…';$('bridgeStatus').innerHTML='<span class="warn">Creating Gmail draft and attaching rules…</span>';try{const u=cfg.url+'?action=createDraft&key='+encodeURIComponent(cfg.key)+'&to='+encodeURIComponent(to)+'&subject='+encodeURIComponent($('subject').value)+'&body='+encodeURIComponent($('message').value)+'&division='+encodeURIComponent($('division').value);const r=await jsonp(u);if(!r||!r.ok)throw new Error(r&&r.error?r.error:'Draft creation failed.');$('bridgeStatus').innerHTML='<span class="ok">DRAFT CREATED!</span> Attached: '+esc((r.attachments||[]).join(' + '));alert('Gmail draft created with the correct rules PDF attachment(s). Open Gmail Drafts to review and send.')}catch(e){$('bridgeStatus').innerHTML='<span class="bad">DRAFT FAILED:</span> '+esc(e.message||e);alert('Draft failed: '+(e.message||e))}finally{b.disabled=false;b.textContent='CREATE GMAIL DRAFT + ATTACH PDF'}}
+$('saveBtn').onclick=()=>saveRacer(false);$('clearBtn').onclick=clearForm;$('markSentBtn').onclick=markSent;$('exportJson').onclick=exportManager;$('exportCsv').onclick=exportCsv;$('draftBtn').onclick=createDraft;
+$('copyBtn').onclick=async()=>{try{await navigator.clipboard.writeText(`Subject: ${$('subject').value}\n\n${$('message').value}`);alert('Email copied.')}catch(e){$('message').select();document.execCommand('copy');alert('Message copied.')}}
+syncPdfDefaults();render();showBridge();
+</script></body></html>
