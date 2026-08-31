@@ -1,8 +1,8 @@
 """Packaged entry point for MNLT Derby Manager Desktop v1.
 
-Desktop v1 starts from the proven browser-independent SQLite foundation and
-restores the Gmail registration bridge and audience projector before layout
-polish begins.
+Race-day build: local SQLite state, projector output, backups, and the verified
+race engine. Registration email/inbox integrations are intentionally excluded
+from the race-day executable.
 """
 
 from __future__ import annotations
@@ -14,12 +14,10 @@ from backup import create_full_backup
 from migration import import_v42_backup
 from storage import ensure_state
 import desktop_fixes
-import gmail_bridge
 
 
 desktop_app.APP_VERSION = "Desktop v1"
 desktop_fixes.install()
-gmail_bridge.install(desktop_app)
 
 _original_backup_init = desktop_app.BackupPage.__init__
 
