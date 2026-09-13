@@ -14,10 +14,12 @@ from backup import create_full_backup
 from migration import import_v42_backup
 from storage import ensure_state
 import desktop_fixes
+import gmail_bridge
 
 
 desktop_app.APP_VERSION = "Desktop v1"
 desktop_fixes.install()
+gmail_bridge.install(desktop_app)
 
 _original_backup_init = desktop_app.BackupPage.__init__
 
